@@ -6,8 +6,8 @@
 
 set -eo pipefail
 
+INITIAL_PWD="$PWD"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
 
 # Colors for terminal output
 BOLD="\033[1m"
@@ -24,7 +24,8 @@ VITE_PORT=5173
 DEV_MODE=false
 FORCE_BUILD=false
 NO_BROWSER=false
-TARGET_PATH="tests/fixtures/sample-app"
+USER_SPECIFIED_PORT=false
+TARGET_PATH=""
 
 # Help message
 show_help() {
@@ -69,6 +70,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     -p|--port)
       PORT="$2"
+      USER_SPECIFIED_PORT=true
       shift 2
       ;;
     --no-browser)
@@ -87,7 +89,23 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Ensure Rust & Cargo are available (handling mise / cargo environments)
+# Resolve TARGET_PATH relative to where command was called or script directory
+if [[ -z "$TARGET_PATH" ]]; then
+  TARGET_PATH="$SCRIPT_DIR/tests/fixtures/sample-app"
+elif [[ "$TARGET_PATH" != /* ]]; then
+  if [[ -d "$INITIAL_PWD/$TARGET_PATH" ]]; then
+    TARGET_PATH="$INITIAL_PWD/$TARGET_PATH"
+  elif [[ -d "$SCRIPT_DIR/$TARGET_PATH" ]]; then
+    TARGET_PATH="$SCRIPT_DIR/$TARGET_PATH"
+  else
+    echo -e "${YELLOW}Warning: Target directory '${TARGET_PATH}' does not exist.${RESET}"
+    TARGET_PATH="$INITIAL_PWD"
+  fi
+fi
+
+cd "$SCRIPT_DIR"
+
+# Resolve Cargo runner command
 run_cargo() {
   if command -v cargo >/dev/null 2>&1; then
     cargo "$@"
@@ -96,29 +114,41 @@ run_cargo() {
   elif [ -f "$HOME/.cargo/bin/cargo" ]; then
     "$HOME/.cargo/bin/cargo" "$@"
   else
-    echo -e "${RED}Error: Cargo is not installed or not in PATH.${RESET}"
-    echo "Install Rust via 'mise use rust@latest' or 'curl https://sh.rustup.rs -sSf | sh'"
+    echo -e "${RED}Error: Cargo is not found in PATH or via mise.${RESET}"
     exit 1
   fi
 }
 
-# Ensure Node & npm are available
+# Resolve npm runner command
 run_npm() {
   if command -v npm >/dev/null 2>&1; then
     npm "$@"
   elif command -v mise >/dev/null 2>&1; then
     mise exec -- npm "$@"
   else
-    echo -e "${RED}Error: Node.js/npm is not found in PATH.${RESET}"
+    echo -e "${RED}Error: npm is not found in PATH or via mise.${RESET}"
     exit 1
   fi
 }
 
-# Resolve target path relative to current or absolute
-if [[ ! -d "$TARGET_PATH" ]]; then
-  echo -e "${YELLOW}Warning: Target directory '${TARGET_PATH}' does not exist.${RESET}"
-  echo -e "Defaulting to current directory: ${CYAN}.${RESET}"
-  TARGET_PATH="."
+# Check if a port is in use
+is_port_in_use() {
+  local p="$1"
+  (echo > "/dev/tcp/127.0.0.1/$p") 2>/dev/null
+}
+
+# Port conflict resolution
+if is_port_in_use "$PORT"; then
+  if [[ "$USER_SPECIFIED_PORT" == true ]]; then
+    echo -e "${RED}Error: Specified port ${PORT} is already in use by another process.${RESET}"
+    exit 1
+  else
+    echo -e "${YELLOW}Notice: Default port ${PORT} is in use.${RESET}"
+    while is_port_in_use "$PORT"; do
+      PORT=$((PORT + 1))
+    done
+    echo -e "${CYAN}Automatically using open port ${PORT}.${RESET}"
+  fi
 fi
 
 # Print banner
@@ -133,37 +163,30 @@ echo -e "${RESET}"
 echo -e "${BOLD}Target Codebase:${RESET} ${GREEN}${TARGET_PATH}${RESET}"
 echo -e "${BOLD}Backend Port:${RESET}    ${CYAN}${PORT}${RESET}"
 
-# Build frontend if missing or requested
+# Ensure web/node_modules exists
+if [[ ! -d "web/node_modules" ]]; then
+  echo -e "\n${BOLD}${CYAN}Installing web dependencies...${RESET}"
+  (cd web && run_npm install)
+fi
+
+# Build frontend if dist missing or force build requested
 if [[ "$FORCE_BUILD" == true || (! -d "web/dist" && "$DEV_MODE" == false) ]]; then
   echo -e "\n${BOLD}${MAGENTA}Building frontend assets (web/dist)...${RESET}"
   (cd web && run_npm run build)
 fi
 
-# Cleanup handler on exit
-BACKEND_PID=""
-FRONTEND_PID=""
-cleanup() {
-  echo -e "\n${YELLOW}Shutting down Unfog session...${RESET}"
-  if [[ -n "$BACKEND_PID" ]] && kill -0 "$BACKEND_PID" 2>/dev/null; then
-    kill "$BACKEND_PID" 2>/dev/null || true
-  fi
-  if [[ -n "$FRONTEND_PID" ]] && kill -0 "$FRONTEND_PID" 2>/dev/null; then
-    kill "$FRONTEND_PID" 2>/dev/null || true
-  fi
-  exit 0
-}
-trap cleanup SIGINT SIGTERM EXIT
-
-# Function to open browser
-open_browser_url() {
-  local target_url="$1"
-  if [[ "$NO_BROWSER" == false ]]; then
-    sleep 1.2
-    if command -v xdg-open >/dev/null 2>&1; then
-      xdg-open "$target_url" >/dev/null 2>&1 || true
-    elif command -v open >/dev/null 2>&1; then
-      open "$target_url" >/dev/null 2>&1 || true
-    fi
+# Helper to launch browser if graphical environment is available
+try_open_browser() {
+  local url="$1"
+  if [[ "$NO_BROWSER" == false && ( -n "$DISPLAY" || -n "$WAYLAND_DISPLAY" || "$(uname)" == "Darwin" ) ]]; then
+    (
+      sleep 1.2
+      if command -v xdg-open >/dev/null 2>&1; then
+        xdg-open "$url" >/dev/null 2>&1 || true
+      elif command -v open >/dev/null 2>&1; then
+        open "$url" >/dev/null 2>&1 || true
+      fi
+    ) &
   fi
 }
 
@@ -173,18 +196,37 @@ if [[ "$DEV_MODE" == true ]]; then
   # --------------------------------------------------------------------------
   echo -e "${BOLD}Mode:${RESET}            ${YELLOW}Fullstack Dev (Vite HMR on :${VITE_PORT})${RESET}\n"
 
+  # Find open port for Vite if default is busy
+  while is_port_in_use "$VITE_PORT"; do
+    VITE_PORT=$((VITE_PORT + 1))
+  done
+
+  BACKEND_PID=""
+  FRONTEND_PID=""
+
+  cleanup_dev() {
+    trap - SIGINT SIGTERM
+    echo -e "\n${YELLOW}Shutting down Unfog dev processes...${RESET}"
+    if [[ -n "$FRONTEND_PID" ]] && kill -0 "$FRONTEND_PID" 2>/dev/null; then
+      kill "$FRONTEND_PID" 2>/dev/null || true
+    fi
+    if [[ -n "$BACKEND_PID" ]] && kill -0 "$BACKEND_PID" 2>/dev/null; then
+      kill "$BACKEND_PID" 2>/dev/null || true
+    fi
+    exit 0
+  }
+  trap cleanup_dev SIGINT SIGTERM
+
   echo -e "${CYAN}Starting Rust backend server on :${PORT}...${RESET}"
   run_cargo run -q -p unfog-cli -- --no-browser --port "$PORT" "$TARGET_PATH" &
   BACKEND_PID=$!
 
-  # Wait for backend to be ready
-  echo -e "${CYAN}Waiting for backend health check...${RESET}"
-  for i in {1..30}; do
-    if curl -s "http://127.0.0.1:${PORT}/api/health" | grep -q '"status":"ok"'; then
-      echo -e "${GREEN}✓ Backend is ready!${RESET}"
+  # Wait for backend health check
+  for i in {1..40}; do
+    if curl -s "http://127.0.0.1:${PORT}/api/health" 2>/dev/null | grep -q '"status":"ok"'; then
       break
     fi
-    sleep 0.3
+    sleep 0.2
   done
 
   echo -e "\n${GREEN}${BOLD}====================================================${RESET}"
@@ -192,13 +234,14 @@ if [[ "$DEV_MODE" == true ]]; then
   echo -e "${BOLD} Backend API:${RESET}     ${CYAN}http://localhost:${PORT}/api${RESET}"
   echo -e "${GREEN}${BOLD}====================================================${RESET}\n"
 
-  open_browser_url "http://localhost:${VITE_PORT}" &
+  try_open_browser "http://localhost:${VITE_PORT}"
 
-  echo -e "${MAGENTA}Starting Vite frontend development server...${RESET}"
+  echo -e "${MAGENTA}Starting Vite development server on port ${VITE_PORT}...${RESET}"
+  export VITE_BACKEND_PORT="$PORT"
   (cd web && run_npm run dev -- --port "$VITE_PORT") &
   FRONTEND_PID=$!
 
-  wait "$BACKEND_PID" "$FRONTEND_PID"
+  wait "$FRONTEND_PID" "$BACKEND_PID"
 
 else
   # --------------------------------------------------------------------------
@@ -215,5 +258,6 @@ else
     CLI_ARGS+=(--no-browser)
   fi
 
+  # Run backend directly in foreground
   run_cargo run -q -p unfog-cli -- "${CLI_ARGS[@]}" "$TARGET_PATH"
 fi
