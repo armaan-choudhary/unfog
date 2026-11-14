@@ -5,12 +5,10 @@ import {
   X, 
   Sparkles, 
   HelpCircle, 
-  AlertOctagon, 
-  CheckCircle2, 
-  XCircle, 
+  AlertCircle, 
+  Check, 
   ArrowRight, 
-  Loader2,
-  Check
+  Loader2 
 } from 'lucide-react';
 
 interface SandboxChallengeModalProps {
@@ -28,18 +26,15 @@ export const SandboxChallengeModal: React.FC<SandboxChallengeModalProps> = ({
 }) => {
   const [tab, setTab] = useState<'challenge' | 'break'>('challenge');
 
-  // Challenge state
   const [challenge, setChallenge] = useState<MicroChallenge | null>(null);
   const [loadingChallenge, setLoadingChallenge] = useState(false);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
 
-  // Break-It Sandbox state
   const [breakSandbox, setBreakSandbox] = useState<BreakPrediction | null>(null);
   const [loadingBreak, setLoadingBreak] = useState(false);
   const [revealedBreak, setRevealedBreak] = useState(false);
 
-  // Load challenge on open or step change
   useEffect(() => {
     if (!isOpen) {
       setSelectedOption(null);
@@ -55,7 +50,6 @@ export const SandboxChallengeModal: React.FC<SandboxChallengeModalProps> = ({
         setChallenge(data);
       })
       .catch(() => {
-        // Fallback dynamic challenge generated from code
         setChallenge({
           question: `In ${step.label} (${step.file}), what happens if the upstream promise throws an unhandled rejection?`,
           options: [
@@ -79,7 +73,6 @@ export const SandboxChallengeModal: React.FC<SandboxChallengeModalProps> = ({
         setBreakSandbox(data);
       })
       .catch(() => {
-        // Fallback dynamic mutated code
         setBreakSandbox({
           mutated_code: step.activeFunctionCode.replace(/if\s*\(!file\)\s*return;/g, '// [MUTATED: Check removed]\n  // if (!file) return;'),
           failure_prediction_question: 'What runtime bug occurs if this null/guard check is removed?',
@@ -103,55 +96,55 @@ export const SandboxChallengeModal: React.FC<SandboxChallengeModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#07080b]/85 backdrop-blur-md">
+      <div className="relative w-full max-w-2xl bg-[#0c0e15] border border-white/10 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/90">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] bg-[#090b10]">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-amber-400" />
+            <div className="w-7 h-7 rounded bg-white/[0.04] border border-white/10 flex items-center justify-center">
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-slate-100 flex items-center gap-2">
-                <span>Prove-It Comprehension Sandbox</span>
-                <span className="text-xs font-mono text-cyan-400">({step.label})</span>
+              <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-100 flex items-center gap-2">
+                <span>Comprehension Sandbox</span>
+                <span className="text-cyan-400">({step.label})</span>
               </h2>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-zinc-500 font-sans">
                 10-second comprehension checks and first-principles debugging intuition.
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
+            className="p-1 text-zinc-500 hover:text-zinc-200 transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Tab switcher */}
-        <div className="px-6 py-2.5 bg-slate-950 border-b border-slate-800 flex items-center gap-2">
+        <div className="px-6 py-2.5 bg-[#090b10] border-b border-white/[0.08] flex items-center gap-2 font-mono text-xs">
           <button
             onClick={() => setTab('challenge')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors ${
               tab === 'challenge'
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-400/40 font-medium'
+                : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
             <HelpCircle className="w-3.5 h-3.5" />
-            <span>10-Second Micro-Challenge</span>
+            <span>10s Micro-Challenge</span>
           </button>
           <button
             onClick={() => setTab('break')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors ${
               tab === 'break'
-                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-white/10 text-white border border-white/30 font-medium'
+                : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
-            <AlertOctagon className="w-3.5 h-3.5" />
-            <span>"Break It on Purpose" Sandbox</span>
+            <AlertCircle className="w-3.5 h-3.5" />
+            <span>Break-It Sandbox</span>
           </button>
         </div>
 
@@ -160,17 +153,17 @@ export const SandboxChallengeModal: React.FC<SandboxChallengeModalProps> = ({
           {tab === 'challenge' && (
             <div className="space-y-4">
               {loadingChallenge ? (
-                <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-2">
-                  <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
-                  <span className="text-xs font-mono">Generating dynamic comprehension challenge from AST...</span>
+                <div className="flex flex-col items-center justify-center py-12 text-zinc-500 gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin text-cyan-400" />
+                  <span className="text-xs font-mono">Analyzing AST for comprehension check...</span>
                 </div>
               ) : challenge ? (
                 <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800">
-                    <span className="text-[11px] font-mono text-cyan-400 uppercase tracking-wider block mb-1 font-semibold">
-                      Comprehension Question:
+                  <div className="p-3.5 rounded-lg bg-[#090b10] border border-white/[0.08]">
+                    <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider block mb-1">
+                      Comprehension Prompt:
                     </span>
-                    <p className="text-sm font-medium text-slate-100 leading-relaxed">
+                    <p className="text-xs font-medium text-zinc-100 leading-relaxed font-sans">
                       {challenge.question}
                     </p>
                   </div>
@@ -180,15 +173,15 @@ export const SandboxChallengeModal: React.FC<SandboxChallengeModalProps> = ({
                     {challenge.options.map((opt, idx) => {
                       const isChosen = selectedOption === idx;
                       const isCorrect = idx === challenge.correct_index;
-                      let btnStyle = 'border-slate-800 bg-slate-950/50 hover:border-slate-700 text-slate-300';
+                      let btnStyle = 'border-white/[0.08] bg-[#090b10] hover:border-white/20 text-zinc-300';
 
                       if (selectedOption !== null) {
                         if (isCorrect) {
-                          btnStyle = 'border-emerald-500 bg-emerald-950/30 text-emerald-300 ring-1 ring-emerald-500/50';
+                          btnStyle = 'border-cyan-400 bg-cyan-950/30 text-cyan-300 font-medium shadow-[0_0_12px_rgba(6,182,212,0.15)]';
                         } else if (isChosen) {
-                          btnStyle = 'border-rose-500 bg-rose-950/30 text-rose-300 ring-1 ring-rose-500/50';
+                          btnStyle = 'border-white/40 bg-white/[0.06] text-zinc-400 line-through';
                         } else {
-                          btnStyle = 'border-slate-800/50 bg-slate-950/20 text-slate-500 opacity-60';
+                          btnStyle = 'border-white/[0.04] bg-white/[0.02] text-zinc-600 opacity-50';
                         }
                       }
 
@@ -198,17 +191,14 @@ export const SandboxChallengeModal: React.FC<SandboxChallengeModalProps> = ({
                           type="button"
                           onClick={() => handleSelectAnswer(idx)}
                           disabled={selectedOption !== null}
-                          className={`w-full p-3 rounded-xl border text-left text-xs transition-all flex items-start gap-3 ${btnStyle}`}
+                          className={`w-full p-3 rounded-lg border text-left text-xs transition-all flex items-start gap-2.5 font-sans ${btnStyle}`}
                         >
-                          <span className="w-5 h-5 rounded-full border border-slate-700 flex items-center justify-center text-[10px] font-mono font-bold shrink-0 mt-0.5">
+                          <span className="w-4 h-4 rounded border border-white/20 flex items-center justify-center text-[10px] font-mono text-zinc-400 shrink-0 mt-0.5">
                             {String.fromCharCode(65 + idx)}
                           </span>
                           <span className="flex-1 leading-relaxed">{opt}</span>
                           {selectedOption !== null && isCorrect && (
-                            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                          )}
-                          {selectedOption !== null && isChosen && !isCorrect && (
-                            <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                            <Check className="w-4 h-4 text-cyan-400 shrink-0" />
                           )}
                         </button>
                       );
@@ -217,19 +207,19 @@ export const SandboxChallengeModal: React.FC<SandboxChallengeModalProps> = ({
 
                   {/* Explanation card */}
                   {showExplanation && (
-                    <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2 animate-in fade-in">
+                    <div className="p-3.5 rounded-lg bg-[#090b10] border border-white/[0.08] space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-mono uppercase tracking-wider font-semibold flex items-center gap-1.5 text-cyan-400">
-                          <Check className="w-3.5 h-3.5" />
-                          Explanation & Mental Model
+                        <span className="text-[10px] font-mono uppercase tracking-wider font-semibold flex items-center gap-1.5 text-cyan-400">
+                          <Check className="w-3 h-3" />
+                          Mental Model Insight
                         </span>
                         {selectedOption === challenge.correct_index && (
-                          <span className="text-[11px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
-                            + Node Defogged!
+                          <span className="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-400/30">
+                            Node Defogged
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-slate-300 leading-relaxed">
+                      <p className="text-xs text-zinc-400 leading-relaxed font-sans">
                         {challenge.explanation}
                       </p>
                     </div>
@@ -242,40 +232,40 @@ export const SandboxChallengeModal: React.FC<SandboxChallengeModalProps> = ({
           {tab === 'break' && (
             <div className="space-y-4">
               {loadingBreak ? (
-                <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-2">
-                  <Loader2 className="w-6 h-6 animate-spin text-rose-400" />
+                <div className="flex flex-col items-center justify-center py-12 text-zinc-500 gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin text-zinc-400" />
                   <span className="text-xs font-mono">Synthesizing intentional failure mutation...</span>
                 </div>
               ) : breakSandbox ? (
                 <div className="space-y-4">
-                  <div className="p-3.5 rounded-xl bg-rose-950/20 border border-rose-800/40">
-                    <span className="text-[11px] font-mono text-rose-400 uppercase tracking-wider block mb-1 font-semibold">
+                  <div className="p-3 rounded-lg bg-[#090b10] border border-white/[0.08]">
+                    <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider block mb-1">
                       Sandbox Mutation (Altered Line):
                     </span>
-                    <pre className="p-3 rounded-lg bg-slate-950 border border-slate-800 text-xs font-mono text-slate-200 overflow-x-auto whitespace-pre leading-relaxed">
+                    <pre className="p-3 rounded bg-[#07080b] border border-white/[0.06] text-xs font-mono text-zinc-300 overflow-x-auto whitespace-pre leading-relaxed">
                       {breakSandbox.mutated_code}
                     </pre>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                    <span className="text-xs font-semibold text-slate-200 block">
+                  <div className="p-3.5 rounded-lg bg-[#090b10] border border-white/[0.08] space-y-2">
+                    <span className="text-xs font-medium text-zinc-200 block font-sans">
                       {breakSandbox.failure_prediction_question}
                     </span>
 
                     {!revealedBreak ? (
                       <button
                         onClick={() => setRevealedBreak(true)}
-                        className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 shadow"
+                        className="px-3.5 py-1.5 bg-cyan-400 hover:bg-cyan-300 text-zinc-950 rounded text-xs font-mono uppercase tracking-wider font-semibold transition-colors flex items-center gap-1.5"
                       >
-                        <span>Reveal Predicted Failure</span>
+                        <span>Reveal Prediction</span>
                         <ArrowRight className="w-3.5 h-3.5" />
                       </button>
                     ) : (
-                      <div className="p-3 rounded-lg bg-rose-950/30 border border-rose-800/50 space-y-1 animate-in fade-in">
-                        <span className="text-[11px] font-mono text-rose-300 uppercase tracking-wider font-bold block">
+                      <div className="p-3 rounded bg-white/[0.03] border border-white/10 space-y-1">
+                        <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider block">
                           Expected Production Breakage:
                         </span>
-                        <p className="text-xs text-slate-200 leading-relaxed">
+                        <p className="text-xs text-zinc-300 leading-relaxed font-sans">
                           {breakSandbox.expected_breakage}
                         </p>
                       </div>
@@ -288,12 +278,12 @@ export const SandboxChallengeModal: React.FC<SandboxChallengeModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3.5 border-t border-slate-800 bg-slate-900/90 flex items-center justify-end">
+        <div className="px-6 py-3 border-t border-white/[0.08] bg-[#090b10] flex items-center justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-medium transition-colors"
+            className="px-3 py-1.5 bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 rounded text-xs font-mono uppercase tracking-wider border border-white/10 transition-colors"
           >
-            Close Sandbox
+            Close
           </button>
         </div>
       </div>

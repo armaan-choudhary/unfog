@@ -1,10 +1,10 @@
 import React from 'react';
 import { GoalSetupConfig, ExecutionStepData } from '../types';
 import { 
-  CloudFog, 
-  Sliders, 
-  FileDown, 
-  ShieldCheck 
+  Cloud, 
+  SlidersHorizontal, 
+  Download, 
+  Check 
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -23,7 +23,6 @@ export const Header: React.FC<HeaderProps> = ({
   onExportModel,
 }) => {
   const clearCount = steps.filter((s) => s.fogState === 'clear').length;
-  const fuzzyCount = steps.filter((s) => s.fogState === 'fuzzy').length;
   const total = steps.length;
   const percentage = Math.round((clearCount / total) * 100);
 
@@ -35,82 +34,75 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="h-14 border-b border-slate-800 bg-slate-950/90 backdrop-blur-md px-5 flex items-center justify-between select-none z-20">
+    <header className="h-14 border-b border-white/[0.08] bg-[#07080c] px-5 flex items-center justify-between select-none z-20">
       {/* Brand & Target Scope */}
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-            <CloudFog className="w-5 h-5 text-slate-950 font-bold" />
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-zinc-900 border border-white/10 flex items-center justify-center">
+            <Cloud className="w-4 h-4 text-cyan-400" />
           </div>
           <div>
-            <h1 className="text-sm font-bold tracking-tight text-white flex items-center gap-1.5">
+            <h1 className="text-xs font-bold tracking-wider text-zinc-100 flex items-center gap-1.5 uppercase font-mono">
               <span>UNFOG</span>
-              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-800/60 uppercase">
-                v0.1
-              </span>
               <span
-                className={`w-2 h-2 rounded-full ml-1 ${
-                  isBackendLive ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]' : 'bg-amber-400/80'
+                className={`w-1.5 h-1.5 rounded-full ${
+                  isBackendLive ? 'bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.8)]' : 'bg-zinc-600'
                 }`}
-                title={isBackendLive ? 'Axum REST API Connected (127.0.0.1:3001)' : 'Standby / Fallback Mock Mode'}
+                title={isBackendLive ? 'Backend API connected' : 'Local Standby'}
               />
             </h1>
           </div>
         </div>
 
-        <div className="h-4 w-[1px] bg-slate-800 hidden sm:block" />
+        <div className="h-4 w-[1px] bg-white/[0.08] hidden sm:block" />
 
         {/* Current Active Goal Badge */}
         <button
           onClick={onOpenConfigModal}
-          className="flex items-center gap-2 px-3 py-1 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 hover:bg-slate-850 text-xs transition-colors"
-          title="Click to change goal & scope"
+          className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-white/[0.03] border border-white/[0.08] hover:border-white/20 text-xs transition-colors"
+          title="Configure Goal & Scope"
         >
-          <span className="font-mono text-cyan-400 font-semibold uppercase text-[11px]">
+          <span className="font-mono text-cyan-400 text-[11px] font-medium uppercase tracking-wider">
             {presetLabels[config.goal] || config.goal}
           </span>
-          <span className="text-slate-600">/</span>
-          <span className="text-slate-300 font-medium truncate max-w-[200px] sm:max-w-xs font-mono text-[11px]">
+          <span className="text-zinc-600">/</span>
+          <span className="text-zinc-300 font-mono text-[11px] truncate max-w-[200px] sm:max-w-xs">
             {config.target}
           </span>
-          <Sliders className="w-3.5 h-3.5 text-slate-400 ml-1" />
+          <SlidersHorizontal className="w-3 h-3 text-zinc-500 ml-0.5" />
         </button>
       </div>
 
       {/* Progress & Actions */}
-      <div className="flex items-center gap-4">
-        {/* Defog Progress */}
+      <div className="flex items-center gap-5">
+        {/* Defog Progress Bar */}
         <div className="flex items-center gap-3">
           <div className="text-right hidden md:block">
-            <div className="text-xs font-medium text-slate-200 flex items-center justify-end gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{clearCount}/{total} Nodes Understood</span>
+            <div className="text-xs font-medium text-zinc-200 flex items-center justify-end gap-1 font-mono">
+              <Check className="w-3 h-3 text-cyan-400" />
+              <span>{clearCount}/{total} Cleared</span>
             </div>
-            <div className="text-[10px] font-mono text-slate-400">
-              {percentage}% Code Ownership
+            <div className="text-[10px] font-mono text-zinc-500">
+              {percentage}% Owned
             </div>
           </div>
 
-          <div className="w-24 sm:w-32 h-2 rounded-full bg-slate-800 overflow-hidden flex">
+          <div className="w-24 sm:w-28 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
             <div
-              className="bg-emerald-500 h-full transition-all duration-300"
+              className="bg-cyan-400 h-full transition-all duration-300"
               style={{ width: `${percentage}%` }}
-            />
-            <div
-              className="bg-amber-500 h-full transition-all duration-300"
-              style={{ width: `${Math.round((fuzzyCount / total) * 100)}%` }}
             />
           </div>
         </div>
 
-        {/* Export ARCHITECTURE.md / .cursorrules */}
+        {/* Export Button */}
         <button
           onClick={onExportModel}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 shadow-sm transition-colors"
-          title="Export Mental Model as ARCHITECTURE.md or .cursorrules"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 border border-white/10 transition-colors"
+          title="Export Model"
         >
-          <FileDown className="w-3.5 h-3.5 text-cyan-400" />
-          <span className="hidden sm:inline">Export Model</span>
+          <Download className="w-3.5 h-3.5 text-zinc-400" />
+          <span className="hidden sm:inline">Export</span>
         </button>
       </div>
     </header>

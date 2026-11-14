@@ -47,7 +47,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     return `# Architecture Mental Model: ${config.target}
 
 > Scoped Execution Flow generated via Unfog.
-> Goal: ${config.goal.toUpperCase()} | Technical Comfort: ${config.technicalLevel}
+> Goal: ${config.goal.toUpperCase()} | Technical Depth: ${config.technicalLevel}
 
 ## Chronological Flow Breakdown
 
@@ -110,42 +110,42 @@ RULES FOR AI GENERATION:
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/90">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#07080b]/85 backdrop-blur-md">
+      <div className="relative w-full max-w-2xl bg-[#0c0e15] border border-white/10 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] bg-[#090b10]">
           <div className="flex items-center gap-2">
-            <FileCode className="w-5 h-5 text-cyan-400" />
-            <h2 className="text-base font-semibold text-slate-100">
+            <FileCode className="w-4 h-4 text-cyan-400" />
+            <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-100">
               Export Scoped Mental Model
             </h2>
-            {loadingExport && <Loader2 className="w-4 h-4 animate-spin text-cyan-400 ml-2" />}
+            {loadingExport && <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400 ml-2" />}
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
+            className="p-1 text-zinc-500 hover:text-zinc-200 transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="px-6 py-3 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="px-6 py-2.5 bg-[#090b10] border-b border-white/[0.08] flex items-center justify-between font-mono text-xs">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => setMode('architecture')}
-              className={`px-3 py-1 rounded-lg text-xs font-mono font-medium transition-colors ${
+              className={`px-2.5 py-1 rounded text-xs transition-colors ${
                 mode === 'architecture'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-400/40 font-medium'
+                  : 'text-zinc-500 hover:text-zinc-300 border border-transparent'
               }`}
             >
               ARCHITECTURE.md
             </button>
             <button
               onClick={() => setMode('cursorrules')}
-              className={`px-3 py-1 rounded-lg text-xs font-mono font-medium transition-colors ${
+              className={`px-2.5 py-1 rounded text-xs transition-colors ${
                 mode === 'cursorrules'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-400/40 font-medium'
+                  : 'text-zinc-500 hover:text-zinc-300 border border-transparent'
               }`}
             >
               .cursorrules
@@ -155,8 +155,8 @@ RULES FOR AI GENERATION:
           <div className="flex items-center gap-2">
             <button
               onClick={handleDownload}
-              className="flex items-center gap-1.5 px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-xs font-medium transition-colors"
-              title="Download file directly"
+              className="flex items-center gap-1 px-2.5 py-1 bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 border border-white/10 rounded text-xs transition-colors"
+              title="Download file"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Download</span>
@@ -164,24 +164,24 @@ RULES FOR AI GENERATION:
 
             <button
               onClick={handleCopy}
-              className="flex items-center gap-1.5 px-3 py-1 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-lg text-xs font-semibold shadow transition-colors"
+              className="flex items-center gap-1 px-3 py-1 bg-cyan-400 hover:bg-cyan-300 text-zinc-950 rounded text-xs font-semibold transition-colors uppercase tracking-wider"
             >
               {copiedType === mode ? (
                 <>
                   <Check className="w-3.5 h-3.5" />
-                  <span>Copied!</span>
+                  <span>Copied</span>
                 </>
               ) : (
                 <>
                   <Copy className="w-3.5 h-3.5" />
-                  <span>Copy to Clipboard</span>
+                  <span>Copy</span>
                 </>
               )}
             </button>
           </div>
         </div>
 
-        <div className="p-6 overflow-y-auto bg-slate-950/60 font-mono text-xs text-slate-300 leading-relaxed whitespace-pre-wrap selection:bg-cyan-500/30">
+        <div className="p-6 overflow-y-auto bg-[#07090e] font-mono text-xs text-zinc-300 leading-relaxed whitespace-pre-wrap selection:bg-cyan-500/30">
           {content}
         </div>
       </div>

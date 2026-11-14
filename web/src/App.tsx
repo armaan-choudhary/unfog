@@ -278,18 +278,18 @@ export function App() {
             {/* Collapse/Expand Code Viewer button */}
             <button
               onClick={() => setIsCodeViewerExpanded((v) => !v)}
-              className="absolute bottom-2 right-4 z-20 flex items-center gap-1 px-2.5 py-1 bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-700 rounded-md text-xs backdrop-blur-md shadow-lg transition-colors"
+              className="absolute bottom-2 right-4 z-20 flex items-center gap-1.5 px-2.5 py-1 bg-[#0d0f15] hover:bg-[#151822] text-zinc-300 border border-white/10 rounded-md text-xs shadow-lg transition-colors font-mono"
               title={isCodeViewerExpanded ? 'Collapse Code Viewer' : 'Expand Code Viewer'}
             >
               {isCodeViewerExpanded ? (
                 <>
                   <PanelBottomClose className="w-3.5 h-3.5 text-cyan-400" />
-                  <span className="font-mono text-[11px]">Hide Code</span>
+                  <span className="text-[11px]">Hide Code</span>
                 </>
               ) : (
                 <>
                   <PanelBottomOpen className="w-3.5 h-3.5 text-cyan-400" />
-                  <span className="font-mono text-[11px]">Show Code</span>
+                  <span className="text-[11px]">Show Code</span>
                 </>
               )}
             </button>
@@ -297,7 +297,7 @@ export function App() {
 
           {/* Code Viewer Panel (CodeMirror 6) */}
           {isCodeViewerExpanded && (
-            <div className="h-[48%] w-full overflow-hidden border-t border-slate-800">
+            <div className="h-[48%] w-full overflow-hidden border-t border-white/[0.08]">
               <CodeViewer step={activeStep} />
             </div>
           )}

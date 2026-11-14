@@ -4,14 +4,14 @@ import { ExecutionStepData } from '../types';
 import { 
   Cloud, 
   Sparkles, 
-  CheckCircle2, 
+  Check, 
   HelpCircle, 
   Code2, 
-  Database, 
   Layers, 
   Radio, 
+  ArrowRight,
   Flame,
-  ArrowRight
+  FileCode
 } from 'lucide-react';
 
 export interface ExecutionNodeData extends ExecutionStepData {
@@ -23,11 +23,11 @@ export interface ExecutionNodeData extends ExecutionStepData {
 }
 
 const typeIcons: Record<string, React.ReactNode> = {
-  component: <Layers className="w-3.5 h-3.5 text-blue-400" />,
-  hook: <Radio className="w-3.5 h-3.5 text-purple-400" />,
-  route: <ArrowRight className="w-3.5 h-3.5 text-emerald-400" />,
-  service: <Cloud className="w-3.5 h-3.5 text-cyan-400" />,
-  db: <Database className="w-3.5 h-3.5 text-rose-400" />,
+  component: <Layers className="w-3 h-3 text-zinc-400" />,
+  hook: <Radio className="w-3 h-3 text-zinc-400" />,
+  route: <ArrowRight className="w-3 h-3 text-zinc-400" />,
+  service: <Cloud className="w-3 h-3 text-zinc-400" />,
+  db: <FileCode className="w-3 h-3 text-zinc-400" />,
 };
 
 export const ExecutionNode: React.FC<NodeProps> = ({ data }) => {
@@ -49,39 +49,39 @@ export const ExecutionNode: React.FC<NodeProps> = ({ data }) => {
     onHoverNode,
   } = nodeData;
 
-  // Fog State Styling
-  // foggy = dashed/muted
-  // fuzzy = amber
-  // clear = solid/bright
+  // Monochromatic Fog States with single Cyan Accent for 'clear'
   const getFogStyle = () => {
     if (fogState === 'clear') {
       return {
-        card: 'border-emerald-500/80 bg-slate-900/90 shadow-[0_0_24px_rgba(16,185,129,0.25)] ring-1 ring-emerald-500/30',
-        badge: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30',
-        label: 'text-emerald-300 font-semibold',
-        statusText: 'Understood (Clear)',
-        icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />,
-        borderStyle: 'border-solid border-2',
+        card: 'border-cyan-400/60 bg-[#0e1219] shadow-[0_0_24px_rgba(6,182,212,0.12)]',
+        badge: 'bg-cyan-500/10 text-cyan-300 border border-cyan-400/30',
+        label: 'text-zinc-100 font-semibold',
+        statusText: 'Defogged',
+        icon: <Check className="w-3 h-3 text-cyan-400" />,
+        borderStyle: 'border-solid border',
+        bodyText: 'text-zinc-300',
       };
     }
     if (fogState === 'fuzzy') {
       return {
-        card: 'border-amber-500/80 bg-slate-900/90 shadow-[0_0_20px_rgba(245,158,11,0.22)] ring-1 ring-amber-500/30',
-        badge: 'bg-amber-500/15 text-amber-400 border border-amber-500/30',
-        label: 'text-amber-200 font-semibold',
-        statusText: 'Fuzzy / Tricky',
-        icon: <HelpCircle className="w-3.5 h-3.5 text-amber-400" />,
-        borderStyle: 'border-solid border-2',
+        card: 'border-white/20 bg-[#0c0e14] shadow-[0_4px_20px_rgba(0,0,0,0.5)]',
+        badge: 'bg-white/[0.06] text-zinc-300 border border-white/15',
+        label: 'text-zinc-200 font-medium',
+        statusText: 'Fuzzy',
+        icon: <HelpCircle className="w-3 h-3 text-zinc-400" />,
+        borderStyle: 'border-dotted border',
+        bodyText: 'text-zinc-400',
       };
     }
-    // foggy: dashed / muted
+    // foggy: frosted / muted / dashed
     return {
-      card: 'border-slate-700/80 bg-slate-950/70 opacity-80 hover:opacity-100 shadow-[0_4px_16px_rgba(0,0,0,0.4)] backdrop-blur-sm',
-      badge: 'bg-slate-800/80 text-slate-400 border border-slate-700',
-      label: 'text-slate-300 font-medium',
-      statusText: 'Unfog Needed',
-      icon: <Cloud className="w-3.5 h-3.5 text-slate-400" />,
-      borderStyle: 'border-dashed border-2',
+      card: 'border-white/10 bg-[#090b10]/90 backdrop-blur-md opacity-75 hover:opacity-100 transition-opacity',
+      badge: 'bg-white/[0.03] text-zinc-500 border border-white/[0.08]',
+      label: 'text-zinc-400 font-medium',
+      statusText: 'Foggy',
+      icon: <Cloud className="w-3 h-3 text-zinc-500" />,
+      borderStyle: 'border-dashed border',
+      bodyText: 'text-zinc-500',
     };
   };
 
@@ -95,44 +95,48 @@ export const ExecutionNode: React.FC<NodeProps> = ({ data }) => {
       className={`relative w-80 rounded-xl transition-all duration-200 cursor-pointer select-none text-left p-4 ${
         fogStyle.borderStyle
       } ${fogStyle.card} ${
-        isActive ? 'ring-2 ring-cyan-400 scale-[1.02] shadow-[0_0_30px_rgba(34,211,238,0.35)]' : ''
+        isActive
+          ? '!border-cyan-400 !ring-2 !ring-cyan-400/40 !bg-[#0f141f] scale-[1.02] shadow-[0_0_30px_rgba(6,182,212,0.25)]'
+          : ''
       } ${
-        isBlastHighlighted ? 'ring-2 ring-rose-500 shadow-[0_0_25px_rgba(244,63,94,0.35)] animate-pulse' : ''
+        isBlastHighlighted
+          ? '!border-white !ring-1 !ring-white/80 !bg-white/[0.06] shadow-[0_0_24px_rgba(255,255,255,0.2)]'
+          : ''
       }`}
     >
       {/* Handles for flow connections */}
       <Handle
         type="target"
         position={Position.Left}
-        className="!w-3 !h-3 !bg-cyan-500 !border-2 !border-slate-900 !-left-2"
+        className="!w-2.5 !h-2.5 !bg-zinc-600 !border-2 !border-[#08090c] !-left-1.5 transition-colors group-hover:!bg-cyan-400"
       />
       <Handle
         type="source"
         position={Position.Right}
-        className="!w-3 !h-3 !bg-cyan-400 !border-2 !border-slate-900 !-right-2"
+        className="!w-2.5 !h-2.5 !bg-cyan-400 !border-2 !border-[#08090c] !-right-1.5"
       />
 
-      {/* Top Bar: Step Index + NodeType + Fog Status Pill */}
-      <div className="flex items-center justify-between gap-2 mb-2">
+      {/* Top Meta Bar */}
+      <div className="flex items-center justify-between gap-2 mb-2.5">
         <div className="flex items-center gap-1.5">
-          <span className="flex items-center justify-center w-5 h-5 rounded-full text-xs font-mono font-bold bg-slate-800 border border-slate-700 text-slate-200">
+          <span className="flex items-center justify-center w-5 h-5 rounded text-[11px] font-mono font-semibold bg-white/[0.06] border border-white/10 text-zinc-300">
             {stepIndex}
           </span>
-          <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono uppercase tracking-wider bg-slate-800/60 text-slate-400 border border-slate-700/50">
+          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider bg-white/[0.04] text-zinc-400 border border-white/[0.08]">
             {typeIcons[nodeType] || <Code2 className="w-3 h-3" />}
             {nodeType}
           </span>
         </div>
 
-        {/* Fog State Pill (Click to toggle) */}
+        {/* Fog State Badge */}
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             onToggleFog?.(id);
           }}
-          title="Click to toggle fog state"
-          className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors hover:brightness-125 ${fogStyle.badge}`}
+          title="Toggle fog state"
+          className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider transition-colors hover:brightness-125 ${fogStyle.badge}`}
         >
           {fogStyle.icon}
           <span>{fogStyle.statusText}</span>
@@ -142,53 +146,47 @@ export const ExecutionNode: React.FC<NodeProps> = ({ data }) => {
       {/* Main Node Content */}
       <div className="space-y-1">
         <div className="flex items-baseline justify-between gap-2">
-          <h3 className={`text-base tracking-tight truncate ${fogStyle.label}`}>
+          <h3 className={`text-sm tracking-tight truncate ${fogStyle.label}`}>
             {label}
           </h3>
-          <span className="text-[11px] font-mono text-cyan-400/90 truncate max-w-[130px]" title={symbol}>
+          <span className="text-[11px] font-mono text-cyan-400/80 truncate max-w-[130px]" title={symbol}>
             .{symbol}()
           </span>
         </div>
         
-        <p className="text-xs font-mono text-slate-400 truncate" title={file}>
+        <p className="text-[11px] font-mono text-zinc-500 truncate" title={file}>
           {file}
         </p>
 
-        <p className="text-xs text-slate-300/90 line-clamp-2 pt-1 font-sans leading-relaxed">
+        <p className={`text-xs ${fogStyle.bodyText} line-clamp-2 pt-1 font-sans leading-relaxed`}>
           {shortSummary}
         </p>
       </div>
 
-      {/* Bottom Indicators: AI Slop Warning or Blast Warning */}
-      <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+      {/* Bottom Indicators */}
+      <div className="mt-3 pt-2.5 border-t border-white/[0.06] flex items-center justify-between text-[11px]">
         {debtRadar?.hasSlop ? (
           <span
-            className="flex items-center gap-1 text-purple-300 font-mono text-[11px] bg-purple-500/15 px-1.5 py-0.5 rounded border border-purple-500/40 truncate max-w-[150px]"
+            className="flex items-center gap-1 text-zinc-300 font-mono text-[10px] uppercase tracking-wider bg-white/[0.06] px-1.5 py-0.5 rounded border border-white/10 truncate max-w-[150px]"
             title={debtRadar.issues.join('; ')}
           >
-            <Sparkles className="w-3 h-3 text-purple-400 shrink-0" />
-            <span className="truncate">
-              {debtRadar.issues[0]?.toLowerCase().includes('secret')
-                ? 'Hardcoded Secret'
-                : debtRadar.issues[0]?.toLowerCase().includes('prop')
-                ? 'Unused Prop'
-                : 'AI Slop Flagged'}
-            </span>
+            <Sparkles className="w-3 h-3 text-cyan-400 shrink-0" />
+            <span className="truncate">AI Debt Flagged</span>
           </span>
         ) : (
-          <span className="text-slate-500 font-mono text-[11px]">Clean Flow</span>
+          <span className="text-zinc-600 font-mono text-[10px] uppercase tracking-wider">Clean</span>
         )}
 
         {isBlastHighlighted && (
-          <span className="flex items-center gap-1 text-rose-400 font-mono font-medium animate-pulse">
-            <Flame className="w-3 h-3" />
-            In Blast Radius
+          <span className="flex items-center gap-1 text-white font-mono text-[10px] uppercase tracking-wider font-semibold">
+            <Flame className="w-3 h-3 text-white" />
+            Impact Zone
           </span>
         )}
 
-        {isActive && (
-          <span className="text-cyan-400 font-mono text-[11px] flex items-center gap-1">
-            Active Focus
+        {isActive && !isBlastHighlighted && (
+          <span className="text-cyan-400 font-mono text-[10px] uppercase tracking-wider flex items-center gap-1">
+            Active
           </span>
         )}
       </div>

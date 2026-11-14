@@ -61,7 +61,6 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ step }) => {
   useEffect(() => {
     if (!editorContainerRef.current) return;
 
-    // Clean up previous view if exists
     if (viewRef.current) {
       viewRef.current.destroy();
     }
@@ -69,35 +68,35 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ step }) => {
     const customTheme = EditorView.theme({
       '&': {
         height: '100%',
-        backgroundColor: '#0c101c !important',
-        color: '#e2e8f0',
+        backgroundColor: '#07090e !important',
+        color: '#e4e4e7',
         fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-        fontSize: '13px',
+        fontSize: '12.5px',
       },
       '.cm-scroller': {
         overflow: 'auto',
-        lineHeight: '1.6',
+        lineHeight: '1.65',
       },
       '.cm-gutters': {
-        backgroundColor: '#090d16',
-        color: '#475569',
-        borderRight: '1px solid #1e293b',
+        backgroundColor: '#07090e',
+        color: '#52525b',
+        borderRight: '1px solid rgba(255,255,255,0.06)',
       },
       '.cm-activeLineGutter': {
-        backgroundColor: '#1e293b',
-        color: '#38bdf8',
+        backgroundColor: 'rgba(255,255,255,0.04)',
+        color: '#22d3ee',
       },
       '.cm-foldPlaceholder': {
-        backgroundColor: '#1e293b',
-        border: '1px solid #334155',
-        color: '#94a3b8',
-        borderRadius: '4px',
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        color: '#71717a',
+        borderRadius: '3px',
         padding: '0 6px',
         margin: '0 4px',
         fontWeight: 'bold',
       },
       '.cm-activeLine': {
-        backgroundColor: 'rgba(56, 189, 248, 0.05)',
+        backgroundColor: 'rgba(6, 182, 212, 0.03)',
       },
     });
 
@@ -110,7 +109,7 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ step }) => {
       foldGutter({
         markerDOM: (open) => {
           const el = document.createElement('span');
-          el.className = 'cm-fold-marker text-slate-500 hover:text-cyan-400 cursor-pointer text-xs';
+          el.className = 'cm-fold-marker text-zinc-600 hover:text-cyan-400 cursor-pointer text-xs';
           el.textContent = open ? '▼' : '▶';
           return el;
         },
@@ -118,7 +117,7 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ step }) => {
       javascript({ jsx: true, typescript: true }),
       oneDark,
       customTheme,
-      EditorView.editable.of(false), // read-only viewer
+      EditorView.editable.of(false),
     ];
 
     const state = EditorState.create({
@@ -134,7 +133,6 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ step }) => {
     viewRef.current = view;
 
     if (isFoldedFocus) {
-      // Delay slightly to let layout compute
       setTimeout(() => applyFolding(view, step), 50);
     }
 
@@ -169,18 +167,18 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ step }) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#0c101c] border-t border-slate-800">
+    <div className="flex flex-col h-full bg-[#07090e] border-t border-white/[0.08]">
       {/* Code Viewer Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-slate-900/90 border-b border-slate-800 text-xs">
+      <div className="flex items-center justify-between px-4 py-2 bg-[#090b10] border-b border-white/[0.08] text-xs font-mono">
         <div className="flex items-center gap-2">
-          <FileCode className="w-4 h-4 text-cyan-400" />
-          <span className="font-mono text-slate-300 font-medium">
+          <FileCode className="w-3.5 h-3.5 text-zinc-500" />
+          <span className="text-zinc-300 font-medium">
             {step.file}
           </span>
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-cyan-950/80 text-cyan-300 border border-cyan-800/60">
+          <span className="px-1.5 py-0.5 rounded text-[10px] bg-white/[0.04] text-cyan-400 border border-white/10">
             function {step.symbol}()
           </span>
-          <span className="text-[11px] font-mono text-slate-500">
+          <span className="text-[10px] text-zinc-600 hidden sm:inline">
             (Lines {step.targetLineRange.start}–{step.targetLineRange.end})
           </span>
         </div>
@@ -189,31 +187,31 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ step }) => {
           {/* Fold/Unfold Toggle */}
           <button
             onClick={toggleFoldMode}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono transition-colors border ${
+            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] transition-colors border ${
               isFoldedFocus
-                ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/40 hover:bg-cyan-500/25'
-                : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
+                ? 'bg-cyan-500/10 text-cyan-300 border-cyan-400/30'
+                : 'bg-white/[0.03] text-zinc-500 border-white/[0.08] hover:text-zinc-300'
             }`}
-            title={isFoldedFocus ? 'Click to show full file' : 'Click to fold unrelated lines'}
+            title={isFoldedFocus ? 'Show full file' : 'Fold unrelated lines'}
           >
-            <FoldHorizontal className="w-3.5 h-3.5" />
-            <span>{isFoldedFocus ? 'Focused Function (Folded)' : 'Full File (Unfolded)'}</span>
+            <FoldHorizontal className="w-3 h-3" />
+            <span>{isFoldedFocus ? 'Folded' : 'Unfolded'}</span>
           </button>
 
           {/* Copy Button */}
           <button
             onClick={handleCopyCode}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+            className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-white/[0.03] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 border border-white/[0.08] transition-colors"
           >
             {copied ? (
               <>
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-400 font-mono">Copied!</span>
+                <Check className="w-3 h-3 text-cyan-400" />
+                <span className="text-cyan-400">Copied</span>
               </>
             ) : (
               <>
-                <Copy className="w-3.5 h-3.5" />
-                <span className="font-mono">Copy</span>
+                <Copy className="w-3 h-3" />
+                <span>Copy</span>
               </>
             )}
           </button>
