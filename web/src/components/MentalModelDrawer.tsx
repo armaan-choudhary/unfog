@@ -169,6 +169,24 @@ export const MentalModelDrawer: React.FC<MentalModelDrawerProps> = ({
               </div>
             ) : (
               <>
+                {/* Horizontal Visual Pipeline Indicator */}
+                <div className="p-2.5 rounded-lg bg-[#07090e] border border-white/[0.08] flex items-center justify-between text-[11px] font-mono shadow-sm">
+                  <div className="flex items-center gap-1 text-zinc-300">
+                    <Zap className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                    <span>Trigger</span>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-cyan-400/50" />
+                  <div className="flex items-center gap-1 text-zinc-300">
+                    <Activity className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                    <span>Mutation</span>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-cyan-400/50" />
+                  <div className="flex items-center gap-1 text-zinc-300">
+                    <Workflow className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                    <span>Side Effect</span>
+                  </div>
+                </div>
+
                 {/* High-level Summary Pill */}
                 <div className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.08] text-xs text-zinc-300 leading-relaxed font-sans">
                   <span className="font-mono text-[10px] text-cyan-400 uppercase tracking-wider block mb-1">
@@ -195,9 +213,9 @@ export const MentalModelDrawer: React.FC<MentalModelDrawerProps> = ({
                 </div>
 
                 {/* PART 2: MUTATION */}
-                <div className="p-3 rounded-lg bg-[#0d0f16] border border-white/[0.08] space-y-1 hover:border-white/20 transition-colors">
+                <div className="p-3 rounded-lg bg-[#0d0f16] border border-white/[0.08] space-y-2 hover:border-white/20 transition-colors">
                   <div className="flex items-center gap-1.5 text-zinc-200">
-                    <Activity className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                    <Activity className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                     <h3 className="text-xs font-mono font-bold uppercase tracking-wider">
                       2. Mutation
                     </h3>
@@ -205,12 +223,22 @@ export const MentalModelDrawer: React.FC<MentalModelDrawerProps> = ({
                   <p className="text-xs text-zinc-400 leading-relaxed pl-5 font-sans">
                     {mutationText}
                   </p>
+                  {step.visualFlow?.stateDiff && (
+                    <div className="ml-5 p-2 rounded bg-cyan-950/20 border border-cyan-400/20 text-[10px] font-mono flex items-center justify-between text-zinc-400">
+                      <span>State:</span>
+                      <div className="flex items-center gap-1 font-semibold">
+                        <span className="text-zinc-500 line-through">{step.visualFlow.stateDiff.before}</span>
+                        <ChevronRight className="w-2.5 h-2.5 text-cyan-400" />
+                        <span className="text-cyan-300">{step.visualFlow.stateDiff.after}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* PART 3: SIDE EFFECTS */}
                 <div className="p-3 rounded-lg bg-[#0d0f16] border border-white/[0.08] space-y-1 hover:border-white/20 transition-colors">
                   <div className="flex items-center gap-1.5 text-zinc-200">
-                    <Workflow className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                    <Workflow className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                     <h3 className="text-xs font-mono font-bold uppercase tracking-wider">
                       3. Side Effects
                     </h3>

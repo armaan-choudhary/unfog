@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { FlowCanvas } from './components/FlowCanvas';
-import { CodeViewer } from './components/CodeViewer';
+import { VisualDataFlowInspector } from './components/VisualDataFlowInspector';
 import { MentalModelDrawer } from './components/MentalModelDrawer';
 import { PreMapModal } from './components/PreMapModal';
 import { ExportModal } from './components/ExportModal';
@@ -261,7 +261,7 @@ export function App() {
           {/* XYFlow Canvas */}
           <div
             className={`w-full transition-all duration-300 relative ${
-              isCodeViewerExpanded ? 'h-[52%]' : 'h-[calc(100%-40px)]'
+              isCodeViewerExpanded ? 'h-[55%]' : 'h-[calc(100%-40px)]'
             }`}
           >
             <FlowCanvas
@@ -275,30 +275,30 @@ export function App() {
               onHoverStep={handleHoverStep}
             />
 
-            {/* Collapse/Expand Code Viewer button */}
+            {/* Collapse/Expand Inspector button */}
             <button
               onClick={() => setIsCodeViewerExpanded((v) => !v)}
               className="absolute bottom-2 right-4 z-20 flex items-center gap-1.5 px-2.5 py-1 bg-[#0d0f15] hover:bg-[#151822] text-zinc-300 border border-white/10 rounded-md text-xs shadow-lg transition-colors font-mono"
-              title={isCodeViewerExpanded ? 'Collapse Code Viewer' : 'Expand Code Viewer'}
+              title={isCodeViewerExpanded ? 'Collapse Data Flow Inspector' : 'Expand Data Flow Inspector'}
             >
               {isCodeViewerExpanded ? (
                 <>
                   <PanelBottomClose className="w-3.5 h-3.5 text-cyan-400" />
-                  <span className="text-[11px]">Hide Code</span>
+                  <span className="text-[11px]">Hide Data Flow</span>
                 </>
               ) : (
                 <>
                   <PanelBottomOpen className="w-3.5 h-3.5 text-cyan-400" />
-                  <span className="text-[11px]">Show Code</span>
+                  <span className="text-[11px]">Show Data Flow</span>
                 </>
               )}
             </button>
           </div>
 
-          {/* Code Viewer Panel (CodeMirror 6) */}
+          {/* Visual Data Flow Inspector Panel */}
           {isCodeViewerExpanded && (
-            <div className="h-[48%] w-full overflow-hidden border-t border-white/[0.08]">
-              <CodeViewer step={activeStep} />
+            <div className="h-[45%] w-full overflow-hidden border-t border-white/[0.08]">
+              <VisualDataFlowInspector step={activeStep} />
             </div>
           )}
         </div>

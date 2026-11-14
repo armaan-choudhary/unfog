@@ -6,12 +6,13 @@ import {
   Sparkles, 
   Check, 
   HelpCircle, 
-  Code2, 
   Layers, 
   Radio, 
   ArrowRight,
   Flame,
-  FileCode
+  FileCode,
+  Globe,
+  Database
 } from 'lucide-react';
 
 export interface ExecutionNodeData extends ExecutionStepData {
@@ -23,11 +24,19 @@ export interface ExecutionNodeData extends ExecutionStepData {
 }
 
 const typeIcons: Record<string, React.ReactNode> = {
-  component: <Layers className="w-3 h-3 text-zinc-400" />,
-  hook: <Radio className="w-3 h-3 text-zinc-400" />,
-  route: <ArrowRight className="w-3 h-3 text-zinc-400" />,
-  service: <Cloud className="w-3 h-3 text-zinc-400" />,
-  db: <FileCode className="w-3 h-3 text-zinc-400" />,
+  component: <Layers className="w-3.5 h-3.5 text-cyan-400" />,
+  hook: <Radio className="w-3.5 h-3.5 text-cyan-400" />,
+  route: <Globe className="w-3.5 h-3.5 text-cyan-400" />,
+  service: <Cloud className="w-3.5 h-3.5 text-cyan-400" />,
+  db: <Database className="w-3.5 h-3.5 text-cyan-400" />,
+};
+
+const typeLabels: Record<string, string> = {
+  component: 'UI Component',
+  hook: 'State Hook',
+  route: 'API Gateway',
+  service: 'Cloud Service',
+  db: 'Database Store',
 };
 
 export const ExecutionNode: React.FC<NodeProps> = ({ data }) => {
@@ -36,7 +45,6 @@ export const ExecutionNode: React.FC<NodeProps> = ({ data }) => {
     id,
     stepIndex,
     label,
-    file,
     symbol,
     nodeType,
     fogState,
@@ -44,12 +52,12 @@ export const ExecutionNode: React.FC<NodeProps> = ({ data }) => {
     isActive,
     isBlastHighlighted,
     debtRadar,
+    visualFlow,
     onSelectNode,
     onToggleFog,
     onHoverNode,
   } = nodeData;
 
-  // Monochromatic Fog States with single Cyan Accent for 'clear'
   const getFogStyle = () => {
     if (fogState === 'clear') {
       return {
@@ -59,7 +67,6 @@ export const ExecutionNode: React.FC<NodeProps> = ({ data }) => {
         statusText: 'Defogged',
         icon: <Check className="w-3 h-3 text-cyan-400" />,
         borderStyle: 'border-solid border',
-        bodyText: 'text-zinc-300',
       };
     }
     if (fogState === 'fuzzy') {
@@ -70,10 +77,8 @@ export const ExecutionNode: React.FC<NodeProps> = ({ data }) => {
         statusText: 'Fuzzy',
         icon: <HelpCircle className="w-3 h-3 text-zinc-400" />,
         borderStyle: 'border-dotted border',
-        bodyText: 'text-zinc-400',
       };
     }
-    // foggy: frosted / muted / dashed
     return {
       card: 'border-white/10 bg-[#090b10]/90 backdrop-blur-md opacity-75 hover:opacity-100 transition-opacity',
       badge: 'bg-white/[0.03] text-zinc-500 border border-white/[0.08]',
@@ -81,7 +86,6 @@ export const ExecutionNode: React.FC<NodeProps> = ({ data }) => {
       statusText: 'Foggy',
       icon: <Cloud className="w-3 h-3 text-zinc-500" />,
       borderStyle: 'border-dashed border',
-      bodyText: 'text-zinc-500',
     };
   };
 
@@ -92,7 +96,7 @@ export const ExecutionNode: React.FC<NodeProps> = ({ data }) => {
       onClick={() => onSelectNode?.(id)}
       onMouseEnter={() => onHoverNode?.(id)}
       onMouseLeave={() => onHoverNode?.(null)}
-      className={`relative w-80 rounded-xl transition-all duration-200 cursor-pointer select-none text-left p-4 ${
+      className={`relative w-84 rounded-xl transition-all duration-200 cursor-pointer select-none text-left p-4 ${
         fogStyle.borderStyle
       } ${fogStyle.card} ${
         isActive
@@ -104,11 +108,11 @@ export const ExecutionNode: React.FC<NodeProps> = ({ data }) => {
           : ''
       }`}
     >
-      {/* Handles for flow connections */}
+      {/* Handles */}
       <Handle
         type="target"
         position={Position.Left}
-        className="!w-2.5 !h-2.5 !bg-zinc-600 !border-2 !border-[#08090c] !-left-1.5 transition-colors group-hover:!bg-cyan-400"
+        className="!w-2.5 !h-2.5 !bg-zinc-600 !border-2 !border-[#08090c] !-left-1.5"
       />
       <Handle
         type="source"
@@ -122,13 +126,13 @@ export const ExecutionNode: React.FC<NodeProps> = ({ data }) => {
           <span className="flex items-center justify-center w-5 h-5 rounded text-[11px] font-mono font-semibold bg-white/[0.06] border border-white/10 text-zinc-300">
             {stepIndex}
           </span>
-          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider bg-white/[0.04] text-zinc-400 border border-white/[0.08]">
-            {typeIcons[nodeType] || <Code2 className="w-3 h-3" />}
-            {nodeType}
+          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider bg-white/[0.04] text-zinc-300 border border-white/[0.08]">
+            {typeIcons[nodeType] || <FileCode className="w-3 h-3" />}
+            {typeLabels[nodeType] || nodeType}
           </span>
         </div>
 
-        {/* Fog State Badge */}
+        {/* Fog State Pill */}
         <button
           type="button"
           onClick={(e) => {
@@ -143,38 +147,62 @@ export const ExecutionNode: React.FC<NodeProps> = ({ data }) => {
         </button>
       </div>
 
-      {/* Main Node Content */}
-      <div className="space-y-1">
+      {/* Node Title & Identity */}
+      <div className="space-y-1 mb-2.5">
         <div className="flex items-baseline justify-between gap-2">
           <h3 className={`text-sm tracking-tight truncate ${fogStyle.label}`}>
             {label}
           </h3>
-          <span className="text-[11px] font-mono text-cyan-400/80 truncate max-w-[130px]" title={symbol}>
+          <span className="text-[11px] font-mono text-cyan-400/90 truncate max-w-[130px]">
             .{symbol}()
           </span>
         </div>
         
-        <p className="text-[11px] font-mono text-zinc-500 truncate" title={file}>
-          {file}
-        </p>
-
-        <p className={`text-xs ${fogStyle.bodyText} line-clamp-2 pt-1 font-sans leading-relaxed`}>
+        <p className="text-[11px] text-zinc-400 line-clamp-1 font-sans">
           {shortSummary}
         </p>
       </div>
 
+      {/* Visual Data Flow Transformation Chip */}
+      <div className="p-2 rounded-lg bg-[#07090e] border border-white/[0.06] space-y-1.5 mb-2 font-mono text-[10px]">
+        <div className="flex items-center justify-between text-zinc-400">
+          <span className="text-zinc-500 uppercase">Input:</span>
+          <span className="text-zinc-200 truncate max-w-[170px]">
+            {visualFlow?.inputBadge || 'Incoming Arguments'}
+          </span>
+        </div>
+        <div className="flex items-center justify-between text-zinc-400 border-t border-white/[0.04] pt-1">
+          <span className="text-zinc-500 uppercase">Output:</span>
+          <span className="text-cyan-400 truncate max-w-[170px]">
+            {visualFlow?.outputBadge || 'Transformed State'}
+          </span>
+        </div>
+      </div>
+
+      {/* State Mutation Pill (if applicable) */}
+      {visualFlow?.stateDiff && (
+        <div className="px-2 py-1 rounded bg-cyan-950/20 border border-cyan-400/20 text-[10px] font-mono flex items-center justify-between text-zinc-400">
+          <span>State:</span>
+          <div className="flex items-center gap-1 font-semibold">
+            <span className="text-zinc-500 line-through">{visualFlow.stateDiff.before}</span>
+            <ArrowRight className="w-2.5 h-2.5 text-cyan-400" />
+            <span className="text-cyan-300">{visualFlow.stateDiff.after}</span>
+          </div>
+        </div>
+      )}
+
       {/* Bottom Indicators */}
-      <div className="mt-3 pt-2.5 border-t border-white/[0.06] flex items-center justify-between text-[11px]">
+      <div className="mt-3 pt-2 border-t border-white/[0.06] flex items-center justify-between text-[11px]">
         {debtRadar?.hasSlop ? (
           <span
-            className="flex items-center gap-1 text-zinc-300 font-mono text-[10px] uppercase tracking-wider bg-white/[0.06] px-1.5 py-0.5 rounded border border-white/10 truncate max-w-[150px]"
+            className="flex items-center gap-1 text-zinc-300 font-mono text-[10px] uppercase tracking-wider bg-white/[0.06] px-1.5 py-0.5 rounded border border-white/10"
             title={debtRadar.issues.join('; ')}
           >
             <Sparkles className="w-3 h-3 text-cyan-400 shrink-0" />
-            <span className="truncate">AI Debt Flagged</span>
+            <span>AI Debt Flagged</span>
           </span>
         ) : (
-          <span className="text-zinc-600 font-mono text-[10px] uppercase tracking-wider">Clean</span>
+          <span className="text-zinc-600 font-mono text-[10px] uppercase tracking-wider">Clean Architecture</span>
         )}
 
         {isBlastHighlighted && (
@@ -185,8 +213,8 @@ export const ExecutionNode: React.FC<NodeProps> = ({ data }) => {
         )}
 
         {isActive && !isBlastHighlighted && (
-          <span className="text-cyan-400 font-mono text-[10px] uppercase tracking-wider flex items-center gap-1">
-            Active
+          <span className="text-cyan-400 font-mono text-[10px] uppercase tracking-wider flex items-center gap-1 font-semibold">
+            Active Focus
           </span>
         )}
       </div>

@@ -132,6 +132,23 @@ export function UploadBtn({ onUploadComplete, allowedTypes = ['image/*'] }: Uplo
     debtRadar: {
       hasSlop: false,
       issues: []
+    },
+    visualFlow: {
+      inputBadge: 'File Picker (<10MB)',
+      inputDetails: 'Native browser event: image/png, image/jpeg',
+      processSteps: [
+        'Intercepts file selection event',
+        'Guards file size against 10MB limit',
+        'Toggles local uploading state to true'
+      ],
+      outputBadge: 'startUpload(file)',
+      outputDetails: 'Delegates binary file to useUpload hook',
+      edgePayload: 'File (Blob)',
+      stateDiff: {
+        variable: 'uploading',
+        before: 'false',
+        after: 'true'
+      }
     }
   },
   {
@@ -240,6 +257,23 @@ export function useUpload() {
     debtRadar: {
       hasSlop: true,
       issues: ['Upload progress jumps from 0 to 100 with no XMLHttpRequest/fetch streaming chunk listener.', 'Missing abort controller for user cancellation.']
+    },
+    visualFlow: {
+      inputBadge: 'File (Blob)',
+      inputDetails: 'startUpload(file) invocation from component',
+      processSteps: [
+        'Resets progress to 0% and clears errors',
+        'Packs binary file into multipart/form-data',
+        'Streams HTTP POST to /api/upload'
+      ],
+      outputBadge: 'POST /api/upload',
+      outputDetails: 'Multipart payload with boundary & headers',
+      edgePayload: 'FormData (multipart)',
+      stateDiff: {
+        variable: 'progress',
+        before: '0%',
+        after: '100%'
+      }
     }
   },
   {
@@ -348,6 +382,23 @@ export async function POST(request: Request) {
     debtRadar: {
       hasSlop: true,
       issues: ['Direct memory buffering via Buffer.from instead of streaming directly to S3 multipart upload.']
+    },
+    visualFlow: {
+      inputBadge: 'NextRequest (multipart)',
+      inputDetails: 'Incoming HTTP POST to /api/upload',
+      processSteps: [
+        'Validates session JWT token via auth()',
+        'Extracts raw binary buffer from request body',
+        'Dispatches parallel write to S3 and PostgreSQL'
+      ],
+      outputBadge: 'uploadToS3(buffer)',
+      outputDetails: 'Awaits S3 PutObject and DB insertion',
+      edgePayload: 'S3 Buffer',
+      stateDiff: {
+        variable: 'status',
+        before: 'pending',
+        after: '200 OK'
+      }
     }
   },
   {
@@ -443,6 +494,23 @@ export async function uploadToS3(
     debtRadar: {
       hasSlop: false,
       issues: []
+    },
+    visualFlow: {
+      inputBadge: 'S3 Buffer & Key',
+      inputDetails: 'uploadToS3(buffer, filename, contentType)',
+      processSteps: [
+        'Generates collision-resistant UUID key prefix',
+        'Builds PutObjectCommand with ContentType',
+        'Sends authenticated payload via AWS SDK v3'
+      ],
+      outputBadge: 'S3 Cloud Object',
+      outputDetails: 'https://bucket.s3.region.amazonaws.com/uploads/...',
+      edgePayload: 'S3 URL & Size',
+      stateDiff: {
+        variable: 'storage',
+        before: 'unallocated',
+        after: 'persisted'
+      }
     }
   },
   {
@@ -544,6 +612,23 @@ export async function saveFileRecord(data: {
     debtRadar: {
       hasSlop: false,
       issues: []
+    },
+    visualFlow: {
+      inputBadge: 'Metadata Record',
+      inputDetails: 'saveFileRecord({ userId, url, key, size })',
+      processSteps: [
+        'Validates relational foreign key to user',
+        'Constructs Prisma fileUpload.create query',
+        'Executes ACID commit in PostgreSQL'
+      ],
+      outputBadge: 'PostgreSQL Row #1042',
+      outputDetails: 'Status READY with indexed storageKey and timestamp',
+      edgePayload: 'DB Record (Ready)',
+      stateDiff: {
+        variable: 'db_records',
+        before: 'N',
+        after: 'N + 1'
+      }
     }
   }
 ];

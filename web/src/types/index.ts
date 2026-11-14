@@ -16,6 +16,20 @@ export interface NodeMentalModel {
   L3: MentalModelDepth; // Deep Dive: Syntax, closures, types, edge cases
 }
 
+export interface VisualDataFlow {
+  inputBadge: string;
+  inputDetails: string;
+  processSteps: string[];
+  outputBadge: string;
+  outputDetails: string;
+  edgePayload?: string;
+  stateDiff?: {
+    variable: string;
+    before: string;
+    after: string;
+  };
+}
+
 export interface ExecutionStepData {
   id: string;
   stepIndex: number;
@@ -29,6 +43,7 @@ export interface ExecutionStepData {
   fullCode: string;
   targetLineRange: { start: number; end: number };
   mentalModel: NodeMentalModel;
+  visualFlow?: VisualDataFlow;
   blastRadius: {
     affectedIds: string[];
     riskScore: 'low' | 'medium' | 'high';

@@ -41,6 +41,24 @@ export function adaptBackendTraceToSteps(
     const sideEffects = step.side_effects || node?.side_effects || 'Dispatches network requests or writes.';
     const summary = step.description || node?.description || step.action;
 
+    const visualFlow = {
+      inputBadge: nodeType === 'component' ? 'User Event' : nodeType === 'route' ? 'HTTP Request' : nodeType === 'db' ? 'SQL Payload' : 'Input Arguments',
+      inputDetails: `${step.label} incoming parameters`,
+      processSteps: [
+        `Triggered: ${step.action}`,
+        `Execute ${step.label} internal logic`,
+        `Resolve outputs and side-effects`
+      ],
+      outputBadge: nodeType === 'route' ? 'HTTP Response' : nodeType === 'db' ? 'Committed Record' : 'State / Output Result',
+      outputDetails: sideEffects,
+      edgePayload: nodeType === 'component' ? 'User Action' : nodeType === 'hook' ? 'State Payload' : nodeType === 'route' ? 'API Payload' : 'Data Object',
+      stateDiff: {
+        variable: step.label.toLowerCase(),
+        before: 'initial',
+        after: 'updated',
+      },
+    };
+
     return {
       id: step.node_id,
       stepIndex: step.step_number || idx + 1,
@@ -56,6 +74,7 @@ export function adaptBackendTraceToSteps(
         start: node?.line_start || 1,
         end: node?.line_end || (snippet ? snippet.split('\n').length : 20),
       },
+      visualFlow,
       mentalModel: {
         L1: {
           trigger,
