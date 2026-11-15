@@ -9,19 +9,39 @@ import {
   Controls,
   MiniMap,
   Node,
-  Edge,
   useNodesState,
   useEdgesState,
-  MarkerType,
   BackgroundVariant,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Search } from "lucide-react";
-import { SourceGraph } from "../../lib/types";
-import { SymbolNode, FileNode, CodebaseNodeData } from "./CustomNode";
+import {
+  Search,
+  ArrowLeft,
+  ChevronRight,
+  FolderTree,
+  FileCode,
+} from "lucide-react";
+import { SourceGraph, HierarchyLevel } from "../../lib/types";
+import {
+  SymbolNode,
+  FileNode,
+  GroupNode,
+  FileSummaryNode,
+  CodebaseNodeData,
+} from "./CustomNode";
+import {
+  extractL1Groups,
+  buildL1NodesAndEdges,
+  buildL2NodesAndEdges,
+  buildL3NodesAndEdges,
+  findHierarchyLocationForSymbol,
+  findHierarchyLocationForPath,
+} from "../../lib/hierarchy";
 import styles from "./CodebaseMap.module.css";
 
 const nodeTypes = {
+  groupNode: GroupNode,
+  fileSummaryNode: FileSummaryNode,
   symbolNode: SymbolNode,
   fileNode: FileNode,
 };
@@ -33,236 +53,155 @@ interface CodebaseMapProps {
   onSelectNode: (nodeData: CodebaseNodeData) => void;
 }
 
-function getFileTier(path: string): number {
-  const p = path.toLowerCase();
-  // Tier 1: Entrypoints / Root architecture / Main servers
-  if (
-    p.includes("app.") ||
-    p.includes("main.") ||
-    p.includes("index.") ||
-    p.includes("server.") ||
-    p.includes("layout.") ||
-    p.includes("page.") ||
-    p.includes("auth.")
-  ) {
-    return 1;
-  }
-  // Tier 2: Components / Domain Models / Views / Core Logic
-  if (
-    p.includes("component") ||
-    p.includes("order") ||
-    p.includes("model") ||
-    p.includes("view") ||
-    p.includes("route") ||
-    p.includes("pricing.")
-  ) {
-    return 2;
-  }
-  // Tier 3: Utilities / Database / Errors / Lib
-  return 3;
-}
-
 function CodebaseMapInner({
   graph,
   selectedNodeId,
   highlightedPath,
   onSelectNode,
 }: CodebaseMapProps) {
-  const { setCenter } = useReactFlow();
+  const { fitView, setCenter } = useReactFlow();
+
+  // Hierarchy state: L1 (Architecture) -> L2 (Modules) -> L3 (Code)
+  const [level, setLevel] = useState<HierarchyLevel>("L1");
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
+
+  // Search and filter state
   const [searchQuery, setSearchQuery] = useState("");
   const [filterKind, setFilterKind] = useState<string>("all");
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
 
-  // Compute graph nodes and balanced 2D cluster layout
-  const { initialNodes, initialEdges } = useMemo(() => {
-    const nodes: Node[] = [];
-    const edges: Edge[] = [];
+  // Derive L1 architecture groups from indexed source files
+  const l1Groups = useMemo(() => {
+    return extractL1Groups(graph);
+  }, [graph]);
 
-    // Group symbols by file_id
-    const symbolsByFileId = new Map<string, typeof graph.symbols>();
-    graph.symbols.forEach((sym) => {
-      const list = symbolsByFileId.get(sym.file_id) || [];
-      list.push(sym);
-      symbolsByFileId.set(sym.file_id, list);
-    });
+  // Adjust hierarchy state when repo, selected node, or citation path changes
+  const [prevRepoId, setPrevRepoId] = useState(graph.snapshot?.repository_id);
+  const [prevSelectedNodeId, setPrevSelectedNodeId] = useState(selectedNodeId);
+  const [prevHighlightedPath, setPrevHighlightedPath] =
+    useState(highlightedPath);
 
-    // 1. Sort files into logical architecture tiers
-    const sortedFiles = [...graph.files].sort((a, b) => {
-      const tierA = getFileTier(a.path);
-      const tierB = getFileTier(b.path);
-      if (tierA !== tierB) return tierA - tierB;
-      return a.path.localeCompare(b.path);
-    });
-
-    // 2. Dynamic 2D column count based on file count and aspect ratio ~1.2
-    const fileCount = sortedFiles.length;
-    let numCols: number;
-    if (fileCount <= 3) {
-      numCols = Math.max(1, fileCount);
-    } else if (fileCount <= 6) {
-      numCols = 3;
-    } else if (fileCount <= 12) {
-      numCols = 3;
-    } else if (fileCount <= 20) {
-      numCols = 4;
-    } else {
-      numCols = Math.max(4, Math.ceil(Math.sqrt(fileCount * 1.2)));
+  if (graph.snapshot?.repository_id !== prevRepoId) {
+    setPrevRepoId(graph.snapshot?.repository_id);
+    setLevel("L1");
+    setSelectedGroupId(null);
+    setSelectedFileId(null);
+    setSearchQuery("");
+  } else if (selectedNodeId && selectedNodeId !== prevSelectedNodeId) {
+    setPrevSelectedNodeId(selectedNodeId);
+    const loc = findHierarchyLocationForSymbol(graph, selectedNodeId, l1Groups);
+    if (loc) {
+      setSelectedGroupId(loc.groupId);
+      setSelectedFileId(loc.fileId);
+      setLevel("L3");
     }
-
-    const clusterWidth = 320;
-    const colGap = 50;
-    const rowGap = 70;
-    const symbolRowSpacing = 160;
-    const fileHeaderSpacing = 160;
-
-    // 3. Pre-calculate cluster height for each file
-    const fileClusterHeights = sortedFiles.map((file) => {
-      const fileSymbols = symbolsByFileId.get(file.id) || [];
-      return fileHeaderSpacing + fileSymbols.length * symbolRowSpacing;
-    });
-
-    // 4. Compute maximum cluster height for each grid row
-    const rowMaxHeights: number[] = [];
-    sortedFiles.forEach((_, idx) => {
-      const rowIdx = Math.floor(idx / numCols);
-      const h = fileClusterHeights[idx];
-      rowMaxHeights[rowIdx] = Math.max(rowMaxHeights[rowIdx] || 0, h);
-    });
-
-    // 5. Compute Y start offsets for each grid row
-    const rowYStarts: number[] = [60];
-    for (let r = 0; r < rowMaxHeights.length - 1; r++) {
-      rowYStarts.push(rowYStarts[r] + rowMaxHeights[r] + rowGap);
+  } else if (highlightedPath && highlightedPath !== prevHighlightedPath) {
+    setPrevHighlightedPath(highlightedPath);
+    const loc = findHierarchyLocationForPath(graph, highlightedPath, l1Groups);
+    if (loc) {
+      setSelectedGroupId(loc.groupId);
+      setSelectedFileId(loc.fileId);
+      setLevel("L3");
     }
+  }
 
-    // 6. Place file clusters in the 2D grid
-    sortedFiles.forEach((file, fileIdx) => {
-      const colIdx = fileIdx % numCols;
-      const rowIdx = Math.floor(fileIdx / numCols);
+  // Navigation callbacks
+  const handleDrillToL2 = useCallback((groupId: string) => {
+    setSelectedGroupId(groupId);
+    setLevel("L2");
+  }, []);
 
-      const colX = 60 + colIdx * (clusterWidth + colGap);
-      let curY = rowYStarts[rowIdx];
+  const handleDrillToL3 = useCallback((fileId: string) => {
+    setSelectedFileId(fileId);
+    setLevel("L3");
+  }, []);
 
-      // File Node
-      const fileNodeId = `node-file-${file.id}`;
-      const fileSymbols = symbolsByFileId.get(file.id) || [];
+  const handleGoBack = useCallback(() => {
+    if (level === "L3") {
+      setLevel("L2");
+    } else if (level === "L2") {
+      setLevel("L1");
+    }
+  }, [level]);
 
-      nodes.push({
-        id: fileNodeId,
-        type: "fileNode",
-        position: { x: colX, y: curY },
-        data: {
-          id: file.id,
-          name: file.path.split("/").pop() || file.path,
-          kind: "file",
-          path: file.path,
-          language: file.language,
-          lineCount: file.line_count,
-          symbolCount: fileSymbols.length,
-          isHighlighted: highlightedPath === file.path,
-        } satisfies CodebaseNodeData,
-      });
+  // Active group and file helpers
+  const activeGroup = useMemo(() => {
+    if (!selectedGroupId) return l1Groups[0] || null;
+    return (
+      l1Groups.find((g) => g.id === selectedGroupId) || l1Groups[0] || null
+    );
+  }, [l1Groups, selectedGroupId]);
 
-      curY += fileHeaderSpacing;
-
-      // Symbol Nodes in this file
-      fileSymbols.forEach((sym) => {
-        const symNodeId = `node-sym-${sym.id}`;
-        nodes.push({
-          id: symNodeId,
-          type: "symbolNode",
-          position: { x: colX, y: curY },
-          data: {
-            id: sym.id,
-            name: sym.name,
-            kind: sym.kind,
-            path: file.path,
-            language: sym.language || file.language,
-            qualifiedName: sym.qualified_name || undefined,
-            range: sym.range,
-            docstring: sym.docstring || undefined,
-            isHighlighted:
-              highlightedPath === file.path || selectedNodeId === sym.id,
-          } satisfies CodebaseNodeData,
-        });
-
-        // Edge from file to symbol (contains)
-        edges.push({
-          id: `edge-contains-${file.id}-${sym.id}`,
-          source: fileNodeId,
-          target: symNodeId,
-          type: "smoothstep",
-          style: {
-            stroke: "var(--color-border)",
-            strokeWidth: 1.5,
-            strokeDasharray: "3,3",
-          },
-        });
-
-        curY += symbolRowSpacing;
-      });
-    });
-
-    // 7. Map source edges (calls, references, extends, renders)
-    graph.edges.forEach((edge) => {
-      const sourceNodeId = `node-sym-${edge.source_symbol_id}`;
-      const targetNodeId = `node-sym-${edge.target_symbol_id}`;
-
-      let strokeColor = "var(--color-accent-violet)";
-      if (edge.kind === "extends") {
-        strokeColor = "var(--color-accent-amber)";
-      } else if (edge.kind === "references") {
-        strokeColor = "var(--color-accent-blue)";
-      } else if (edge.kind === "renders") {
-        strokeColor = "#5eead4";
+  const activeFile = useMemo(() => {
+    if (!selectedFileId) {
+      if (activeGroup && activeGroup.fileIds.length > 0) {
+        return graph.files.find((f) => f.id === activeGroup.fileIds[0]) || null;
       }
+      return graph.files[0] || null;
+    }
+    return (
+      graph.files.find((f) => f.id === selectedFileId) || graph.files[0] || null
+    );
+  }, [graph.files, selectedFileId, activeGroup]);
 
-      edges.push({
-        id: `edge-${edge.id}`,
-        source: sourceNodeId,
-        target: targetNodeId,
-        type: "bezier",
-        label: edge.kind,
-        labelStyle: {
-          fill: "var(--color-text-muted)",
-          fontSize: 10,
-          fontWeight: 600,
-        },
-        labelBgStyle: {
-          fill: "var(--color-panel)",
-          color: "var(--color-text)",
-          fillOpacity: 0.85,
-        },
-        labelBgPadding: [4, 2],
-        labelBgBorderRadius: 4,
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: strokeColor,
-          width: 14,
-          height: 14,
-        },
-        style: {
-          stroke: strokeColor,
-          strokeWidth: 2,
-        },
-        animated: edge.kind === "calls" || edge.kind === "renders",
+  // Generate nodes and edges for current level
+  const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
+    if (level === "L1") {
+      return buildL1NodesAndEdges(graph, l1Groups, (gid) => {
+        handleDrillToL2(gid);
       });
-    });
+    }
 
-    return { initialNodes: nodes, initialEdges: edges };
-  }, [graph, highlightedPath, selectedNodeId]);
+    if (level === "L2") {
+      const gid = activeGroup
+        ? activeGroup.id
+        : l1Groups[0]?.id || "group-root";
+      return buildL2NodesAndEdges(graph, gid, l1Groups, (fid) => {
+        handleDrillToL3(fid);
+      });
+    }
+
+    // L3: Functions and Code
+    const fid = activeFile ? activeFile.id : graph.files[0]?.id || "";
+    return buildL3NodesAndEdges(graph, fid, selectedNodeId, highlightedPath);
+  }, [
+    level,
+    graph,
+    l1Groups,
+    activeGroup,
+    activeFile,
+    selectedNodeId,
+    highlightedPath,
+    handleDrillToL2,
+    handleDrillToL3,
+  ]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  // Sync state when initialNodes or initialEdges change (e.g. repo switch)
+  // Sync React Flow nodes and edges when level or dependencies change
   useEffect(() => {
     setNodes(initialNodes);
     setEdges(initialEdges);
   }, [initialNodes, initialEdges, setNodes, setEdges]);
 
-  // Center on node when selectedNodeId changes
+  // Auto-fit viewport whenever level or graph changes
   useEffect(() => {
-    if (!selectedNodeId) return;
+    const timer = setTimeout(() => {
+      fitView({
+        padding: 0.15,
+        minZoom: 0.6,
+        maxZoom: 0.85,
+        duration: 350,
+      });
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [level, selectedGroupId, selectedFileId, fitView]);
+
+  // Center on symbol in L3 when selectedNodeId changes
+  useEffect(() => {
+    if (level !== "L3" || !selectedNodeId) return;
     const target = nodes.find((n) => {
       const data = n.data as unknown as CodebaseNodeData;
       return data.id === selectedNodeId;
@@ -273,27 +212,32 @@ function CodebaseMapInner({
         duration: 400,
       });
     }
-  }, [selectedNodeId, nodes, setCenter]);
+  }, [level, selectedNodeId, nodes, setCenter]);
 
-  // Node selection handler
+  // Node click handler
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       const nodeData = node.data as unknown as CodebaseNodeData;
-      if (nodeData) {
+      if (!nodeData) return;
+
+      if (level === "L1") {
+        // Drill into L2 on click
+        handleDrillToL2(nodeData.id);
+      } else if (level === "L2") {
+        // Drill into L3 on click
+        handleDrillToL3(nodeData.id);
+      } else if (level === "L3") {
+        // Select symbol and open Source Inspector
         onSelectNode(nodeData);
       }
     },
-    [onSelectNode],
+    [level, handleDrillToL2, handleDrillToL3, onSelectNode],
   );
 
-  // Filter nodes based on search and kind
+  // Filter nodes for search query and entity kinds
   const filteredNodes = useMemo(() => {
     return nodes.map((node) => {
       const data = node.data as unknown as CodebaseNodeData;
-      const matchesSearch =
-        searchQuery === "" ||
-        data.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        data.path.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesKind =
         filterKind === "all" ||
@@ -303,7 +247,12 @@ function CodebaseMapInner({
           (data.kind === "function" || data.kind === "method")) ||
         (filterKind === "class" && data.kind === "class");
 
-      const isHidden = !matchesSearch || !matchesKind;
+      const matchesSearch =
+        searchQuery === "" ||
+        data.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        data.path.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const isHidden = !matchesKind || !matchesSearch;
 
       return {
         ...node,
@@ -311,69 +260,300 @@ function CodebaseMapInner({
         selected: selectedNodeId === data.id,
       };
     });
-  }, [nodes, searchQuery, filterKind, selectedNodeId]);
+  }, [nodes, filterKind, searchQuery, selectedNodeId]);
+
+  // Global repository search results (matches across all symbols and files)
+  const searchResults = useMemo(() => {
+    if (!searchQuery || searchQuery.trim().length < 2) return [];
+    const q = searchQuery.toLowerCase().trim();
+
+    const matches: Array<{
+      id: string;
+      name: string;
+      path: string;
+      kind: string;
+      symbolId?: string;
+      fileId: string;
+      groupId: string;
+    }> = [];
+
+    // Search symbols
+    for (const sym of graph.symbols) {
+      if (
+        sym.name.toLowerCase().includes(q) ||
+        (sym.qualified_name && sym.qualified_name.toLowerCase().includes(q))
+      ) {
+        const loc = findHierarchyLocationForSymbol(graph, sym.id, l1Groups);
+        const file = graph.files.find((f) => f.id === sym.file_id);
+        if (loc && file) {
+          matches.push({
+            id: sym.id,
+            name: sym.name,
+            path: file.path,
+            kind: sym.kind,
+            symbolId: sym.id,
+            fileId: loc.fileId,
+            groupId: loc.groupId,
+          });
+        }
+        if (matches.length >= 8) break;
+      }
+    }
+
+    // Search files
+    if (matches.length < 8) {
+      for (const file of graph.files) {
+        if (file.path.toLowerCase().includes(q)) {
+          const loc = findHierarchyLocationForPath(graph, file.path, l1Groups);
+          if (loc) {
+            matches.push({
+              id: file.id,
+              name: file.path.split("/").pop() || file.path,
+              path: file.path,
+              kind: "file",
+              fileId: file.id,
+              groupId: loc.groupId,
+            });
+          }
+          if (matches.length >= 8) break;
+        }
+      }
+    }
+
+    return matches;
+  }, [searchQuery, graph, l1Groups]);
+
+  // Jump from search result directly to hierarchy location
+  const handleSelectSearchResult = useCallback(
+    (item: (typeof searchResults)[0]) => {
+      setSelectedGroupId(item.groupId);
+      setSelectedFileId(item.fileId);
+      setLevel("L3");
+      setSearchQuery("");
+      setIsSearchFocused(false);
+
+      if (item.symbolId) {
+        const sym = graph.symbols.find((s) => s.id === item.symbolId);
+        if (sym) {
+          onSelectNode({
+            id: sym.id,
+            name: sym.name,
+            kind: sym.kind,
+            path: item.path,
+            language: sym.language,
+            qualifiedName: sym.qualified_name || undefined,
+            range: sym.range,
+            docstring: sym.docstring || undefined,
+          });
+        }
+      }
+    },
+    [graph, onSelectNode],
+  );
 
   return (
     <div className={styles.mapWrapper}>
-      {/* Top Map Toolbar */}
+      {/* Top Map Toolbar: Breadcrumbs, Controls, Level Selector & Search */}
       <div className={styles.mapToolbar}>
-        <div className={styles.searchContainer}>
-          <Search size={14} className={styles.searchIcon} />
-          <input
-            type="text"
-            className={styles.searchInput}
-            placeholder="Search symbols..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+        {/* Row 1: Breadcrumb Trail & Level Pills */}
+        <div className={styles.breadcrumbsBar}>
+          {level !== "L1" && (
+            <button
+              type="button"
+              className={styles.backBtn}
+              onClick={handleGoBack}
+              title="Navigate up one hierarchy level"
+            >
+              <ArrowLeft size={13} />
+              <span>Back</span>
+            </button>
+          )}
+
+          {/* Breadcrumb: L1 Root */}
+          <button
+            type="button"
+            className={`${styles.breadcrumbBtn} ${
+              level === "L1" ? styles.breadcrumbActive : ""
+            }`}
+            onClick={() => setLevel("L1")}
+          >
+            <FolderTree size={14} />
+            <span>Project</span>
+          </button>
+
+          {/* Breadcrumb: L2 Group */}
+          {level !== "L1" && activeGroup && (
+            <>
+              <ChevronRight size={12} className={styles.breadcrumbSep} />
+              <button
+                type="button"
+                className={`${styles.breadcrumbBtn} ${
+                  level === "L2" ? styles.breadcrumbActive : ""
+                }`}
+                onClick={() => setLevel("L2")}
+              >
+                <span>{activeGroup.name}</span>
+              </button>
+            </>
+          )}
+
+          {/* Breadcrumb: L3 File */}
+          {level === "L3" && activeFile && (
+            <>
+              <ChevronRight size={12} className={styles.breadcrumbSep} />
+              <span
+                className={`${styles.breadcrumbBtn} ${styles.breadcrumbActive}`}
+              >
+                <FileCode size={13} />
+                <span>
+                  {activeFile.path.split("/").pop() || activeFile.path}
+                </span>
+              </span>
+            </>
+          )}
+
+          {/* Level Switcher Badges */}
+          <div className={styles.levelIndicatorGroup}>
+            <button
+              type="button"
+              className={`${styles.levelPill} ${
+                level === "L1" ? styles.levelPillActive : ""
+              }`}
+              onClick={() => setLevel("L1")}
+              title="Level 1: Project Architecture"
+            >
+              L1 Architecture
+            </button>
+            <button
+              type="button"
+              className={`${styles.levelPill} ${
+                level === "L2" ? styles.levelPillActiveL2 : ""
+              }`}
+              onClick={() => {
+                if (!selectedGroupId && l1Groups.length > 0) {
+                  setSelectedGroupId(l1Groups[0].id);
+                }
+                setLevel("L2");
+              }}
+              title="Level 2: Modules & Files"
+            >
+              L2 Modules
+            </button>
+            <button
+              type="button"
+              className={`${styles.levelPill} ${
+                level === "L3" ? styles.levelPillActiveL3 : ""
+              }`}
+              onClick={() => {
+                if (!selectedFileId && graph.files.length > 0) {
+                  setSelectedFileId(graph.files[0].id);
+                }
+                setLevel("L3");
+              }}
+              title="Level 3: Functions & Code"
+            >
+              L3 Code
+            </button>
+          </div>
         </div>
 
-        <div className={styles.filterGroup}>
-          <button
-            type="button"
-            className={`${styles.filterBtn} ${
-              filterKind === "all" ? styles.active : ""
-            }`}
-            onClick={() => setFilterKind("all")}
-          >
-            All
-          </button>
-          <button
-            type="button"
-            className={`${styles.filterBtn} ${
-              filterKind === "component" ? styles.active : ""
-            }`}
-            onClick={() => setFilterKind("component")}
-          >
-            Components
-          </button>
-          <button
-            type="button"
-            className={`${styles.filterBtn} ${
-              filterKind === "function" ? styles.active : ""
-            }`}
-            onClick={() => setFilterKind("function")}
-          >
-            Functions
-          </button>
-          <button
-            type="button"
-            className={`${styles.filterBtn} ${
-              filterKind === "class" ? styles.active : ""
-            }`}
-            onClick={() => setFilterKind("class")}
-          >
-            Classes
-          </button>
-          <button
-            type="button"
-            className={`${styles.filterBtn} ${
-              filterKind === "file" ? styles.active : ""
-            }`}
-            onClick={() => setFilterKind("file")}
-          >
-            Files
-          </button>
+        {/* Row 2: Search & Filter Toolbar */}
+        <div className={styles.toolbarRow}>
+          <div className={styles.searchContainer}>
+            <Search size={14} className={styles.searchIcon} />
+            <input
+              type="text"
+              className={styles.searchInput}
+              placeholder="Search repository..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => setIsSearchFocused(true)}
+              onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
+            />
+          </div>
+
+          {/* Global search auto-complete dropdown */}
+          {isSearchFocused && searchResults.length > 0 && (
+            <div className={styles.searchResultsDropdown}>
+              {searchResults.map((res) => (
+                <button
+                  key={`${res.kind}-${res.id}`}
+                  type="button"
+                  className={styles.searchResultItem}
+                  onMouseDown={() => handleSelectSearchResult(res)}
+                >
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    <span className={styles.searchResultTitle}>{res.name}</span>
+                    <span className={styles.searchResultPath}>{res.path}</span>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: "0.625rem",
+                      textTransform: "uppercase",
+                      color:
+                        res.kind === "component"
+                          ? "#5eead4"
+                          : res.kind === "file"
+                            ? "#38bdf8"
+                            : "#c4b5fd",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {res.kind}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Kind filters for current level */}
+          <div className={styles.filterGroup}>
+            <button
+              type="button"
+              className={`${styles.filterBtn} ${
+                filterKind === "all" ? styles.active : ""
+              }`}
+              onClick={() => setFilterKind("all")}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              className={`${styles.filterBtn} ${
+                filterKind === "component" ? styles.active : ""
+              }`}
+              onClick={() => setFilterKind("component")}
+            >
+              Components
+            </button>
+            <button
+              type="button"
+              className={`${styles.filterBtn} ${
+                filterKind === "function" ? styles.active : ""
+              }`}
+              onClick={() => setFilterKind("function")}
+            >
+              Functions
+            </button>
+            <button
+              type="button"
+              className={`${styles.filterBtn} ${
+                filterKind === "class" ? styles.active : ""
+              }`}
+              onClick={() => setFilterKind("class")}
+            >
+              Classes
+            </button>
+            <button
+              type="button"
+              className={`${styles.filterBtn} ${
+                filterKind === "file" ? styles.active : ""
+              }`}
+              onClick={() => setFilterKind("file")}
+            >
+              Files
+            </button>
+          </div>
         </div>
       </div>
 
@@ -403,6 +583,7 @@ function CodebaseMapInner({
           color="rgba(255, 255, 255, 0.08)"
         />
         <Controls
+          position="bottom-right"
           showInteractive={false}
           style={{
             bottom: 20,
@@ -414,10 +595,12 @@ function CodebaseMapInner({
           }}
         />
         <MiniMap
+          position="bottom-right"
           nodeColor={(node) => {
             const data = node.data as unknown as CodebaseNodeData;
+            if (data.kind === "group") return "#a78bfa";
             if (data.kind === "component") return "#5eead4";
-            if (data.kind === "file") return "var(--color-accent-teal)";
+            if (data.kind === "file") return "#38bdf8";
             if (data.kind === "class") return "var(--color-accent-amber)";
             return "var(--color-accent-violet)";
           }}
@@ -434,7 +617,7 @@ function CodebaseMapInner({
         />
       </ReactFlow>
 
-      {/* Top Semantic Legend */}
+      {/* Top Right Semantic Legend */}
       <div className={styles.legendPanel}>
         <div className={styles.legendItem}>
           <span className={`${styles.legendDot} ${styles.comp}`} />
@@ -454,7 +637,7 @@ function CodebaseMapInner({
         </div>
         <div className={styles.legendItem}>
           <span className={`${styles.legendDot} ${styles.edge}`} />
-          <span>Calls / References</span>
+          <span>Dependencies</span>
         </div>
       </div>
     </div>

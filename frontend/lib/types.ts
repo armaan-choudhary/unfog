@@ -202,3 +202,33 @@ export interface RepositoryOption {
   repo?: string;
   isBundled?: boolean;
 }
+
+export type HierarchyLevel = "L1" | "L2" | "L3";
+
+export interface L1GroupSummary {
+  id: string;
+  name: string;
+  pathPrefix: string;
+  fileCount: number;
+  symbolCount: number;
+  fileIds: string[];
+  previewFiles: Array<{ name: string; path: string; language: string }>;
+}
+
+export interface L2FileSummary {
+  id: string;
+  fileId: string;
+  name: string;
+  path: string;
+  language: string;
+  lineCount: number;
+  symbolCount: number;
+  previewSymbols: Array<{ id: string; name: string; kind: SymbolKind }>;
+}
+
+export interface BreadcrumbItem {
+  level: HierarchyLevel;
+  label: string;
+  groupId?: string;
+  fileId?: string;
+}

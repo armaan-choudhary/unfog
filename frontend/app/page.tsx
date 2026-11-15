@@ -33,28 +33,10 @@ export default function DashboardPage() {
     useState<string>("sample_service");
   const [graph, setGraph] = useState<SourceGraph>(MOCK_SOURCE_GRAPH);
   const [selectedNode, setSelectedNode] = useState<CodebaseNodeData | null>(
-    () => {
-      // Default initial selection to verify_token for sample_service
-      const firstSym = MOCK_SOURCE_GRAPH.symbols[0];
-      const firstFile = MOCK_SOURCE_GRAPH.files.find(
-        (f) => f.id === firstSym?.file_id,
-      );
-      if (firstSym && firstFile) {
-        return {
-          id: firstSym.id,
-          name: firstSym.name,
-          kind: firstSym.kind,
-          path: firstFile.path,
-          qualifiedName: firstSym.qualified_name || undefined,
-          range: firstSym.range,
-          docstring: firstSym.docstring || undefined,
-        };
-      }
-      return null;
-    },
+    null,
   );
   const [highlightedPath, setHighlightedPath] = useState<string | undefined>(
-    "service/auth.py",
+    undefined,
   );
   const [activeTab, setActiveTab] = useState<InspectorTab>("source");
   const [connectionStatus, setConnectionStatus] =
@@ -219,6 +201,7 @@ export default function DashboardPage() {
       {/* Main Workspace */}
       <div className="mainContent">
         <CodebaseMap
+          key={graph.snapshot?.id || selectedRepoId}
           graph={graph}
           selectedNodeId={selectedNode?.id}
           highlightedPath={highlightedPath}

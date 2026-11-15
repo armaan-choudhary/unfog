@@ -506,6 +506,16 @@ async function runBrowserJourney() {
       throw new Error(`Expected repo select to switch to "${REPO1.repo_id}", got: "${updatedRepoVal}"`);
     }
 
+    // In the 3-level expandable map, navigate L1 (components) -> L2 (Header.jsx) -> L3 (Header symbol)
+    const compGroup = page.locator('.react-flow__node-groupNode', { hasText: 'components' });
+    if (await compGroup.isVisible()) {
+      await compGroup.click();
+      await page.waitForTimeout(400);
+      const headerFile = page.locator('.react-flow__node-fileSummaryNode', { hasText: 'Header.jsx' });
+      await headerFile.click();
+      await page.waitForTimeout(400);
+    }
+
     // Verify React Flow canvas renders React component "Header"
     const headerNode = page.locator('.react-flow__node-symbolNode:has-text("Header")').first();
     await headerNode.waitFor({ state: 'visible', timeout: 5000 });
@@ -592,7 +602,13 @@ async function runBrowserJourney() {
     await importBtn.click();
     await modalHeader.waitFor({ state: 'visible', timeout: 5000 });
     await urlInput.fill(REPO2.url);
+    await page.waitForTimeout(400);
+    const graphResponsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/api/v1/codebase/graph') && resp.status() === 200,
+      { timeout: 10000 }
+    );
     await submitBtn.click();
+    await graphResponsePromise;
 
     activeRepoId = REPO2.repo_id;
     await modalHeader.waitFor({ state: 'hidden', timeout: 8000 });
@@ -604,10 +620,13 @@ async function runBrowserJourney() {
     }
     logPass('Repo 2 (pallets/click - Python) imported and active on dashboard.');
 
-    // -------------------------------------------------------------------------
+    // -------------------------------------------------------------
     // Step 11: Verify multi-language state isolation
-    // -------------------------------------------------------------------------
+    // -------------------------------------------------------------
     logStep(11, 'Verify Multi-Language State Isolation (React vs Python)');
+    // Wait for previous repository's symbol nodes to unmount
+    await page.waitForSelector('.react-flow__node-symbolNode:has-text("Header")', { state: 'detached', timeout: 10000 });
+
     // 1. React components (Header) should NOT leak into pallets/click canvas
     const oldHeaderNode = page.locator('.react-flow__node-symbolNode:has-text("Header")');
     const oldNodeCount = await oldHeaderNode.count();
@@ -615,7 +634,17 @@ async function runBrowserJourney() {
       throw new Error('Leak detected: React "Header" component node still rendered in Python graph.');
     }
 
-    // 2. Python function "echo" should be rendered
+    // 2. In 3-level map, drill into src/click -> utils.py -> verify "echo"
+    const clickGroup = page.locator('.react-flow__node-groupNode', { hasText: 'click' });
+    if (await clickGroup.isVisible()) {
+      await clickGroup.click();
+      await page.waitForTimeout(400);
+      const utilsFile = page.locator('.react-flow__node-fileSummaryNode', { hasText: 'utils.py' });
+      await utilsFile.click();
+      await page.waitForTimeout(400);
+    }
+
+    // Python function "echo" should be rendered
     const echoNode = page.locator('.react-flow__node-symbolNode:has-text("echo")').first();
     await echoNode.waitFor({ state: 'visible', timeout: 5000 });
 
@@ -643,6 +672,17 @@ async function runBrowserJourney() {
     const baselineRepoVal = await repoSelect.inputValue();
     if (baselineRepoVal !== 'sample_service') {
       throw new Error(`Expected repo select to revert to "sample_service", got: "${baselineRepoVal}"`);
+    }
+
+    // In 3-level map, drill into service -> auth.py to verify verify_token
+    await page.waitForSelector('.react-flow__node-groupNode', { timeout: 8000 });
+    const serviceGroup = page.locator('.react-flow__node-groupNode', { hasText: 'service' });
+    if (await serviceGroup.isVisible()) {
+      await serviceGroup.click();
+      await page.waitForTimeout(400);
+      const authFile = page.locator('.react-flow__node-fileSummaryNode', { hasText: 'auth.py' });
+      await authFile.click();
+      await page.waitForTimeout(400);
     }
 
     const verifyTokenNode = page.locator('text=verify_token').first();
