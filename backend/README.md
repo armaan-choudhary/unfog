@@ -49,6 +49,43 @@ The app factory disposes its SQLAlchemy engine during shutdown. Request logs are
 JSON and include request IDs and status metadata; access paths, queries, request
 bodies, source text, and exception details are omitted.
 
+## Background workers
+
+The worker app reads `REDIS_URL` and the bounded task/retry settings listed in
+the root `.env.example`. PostgreSQL remains authoritative for job state; Redis
+messages contain only the UUIDv4 job ID. There is no public task submission
+route yet. The internal `submit_echo_job` service persists a job first and
+publishes the same UUID as the Celery task ID. A caller retrying submission must
+reuse that job ID.
+
+For a local stack from the repository root:
+
+```bash
+docker compose up --build -d postgres redis
+docker compose run --rm api alembic upgrade head
+docker compose up --build api worker
+```
+
+The `api` and `worker` services are included in `compose.yaml`; starting only
+PostgreSQL and Redis first allows the initial migration to run explicitly. The
+Compose credentials and published ports are for local development only. Do not
+reuse them outside a local machine. To run processes from a Python environment
+instead, set `DATABASE_URL` and `REDIS_URL`, then use:
+
+```bash
+uvicorn app.main:create_app --factory --no-access-log
+celery -A app.workers.celery_app:celery_app worker --loglevel=INFO
+```
+
+Celery uses late acknowledgements, one prefetched task per worker, bounded
+soft/hard time limits, and bounded exponential retry delays with jitter. Every
+delivery opens and closes its own SQLAlchemy sessions. Duplicate deliveries
+lock and inspect the same PostgreSQL job; terminal or already-running records
+are not executed again. A worker killed after it commits `running` may leave a
+stale job; `list_stalled_jobs` reports only old queued/running UUIDs for
+operator diagnosis. Operators can explicitly requeue a stale running record
+with `requeue_stalled_job`, then submit the same job UUID again. Automatic
+requeue is deliberately not enabled.
 
 Run backend tests and quality checks from this directory:
 

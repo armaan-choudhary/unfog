@@ -48,6 +48,8 @@ class JsonLogFormatter(logging.Formatter):
         }
         for key in (
             "request_id",
+            "job_id",
+            "retry_count",
             "http_method",
             "http_status",
             "duration_ms",
