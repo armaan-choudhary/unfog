@@ -73,7 +73,8 @@ addresses or data loss.
 For local work only, set `UNFOG_DEV_AUTH_ENABLED=true`, provide a generated
 `UNFOG_DEV_AUTH_TOKEN` of at least 32 characters, and configure
 `UNFOG_DEV_AUTH_EMAIL` and optionally `UNFOG_DEV_AUTH_SUBJECT`. The flag is
-accepted only with `APP_ENV=development`; it cannot be enabled in production.
+accepted only when `APP_ENV=development` is explicitly set; it cannot be
+enabled in production or with an unset environment name.
 The configured bearer secret maps to one local identity. `X-User-ID` and other
 identity headers are ignored.
 

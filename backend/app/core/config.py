@@ -150,6 +150,10 @@ class Settings:
         raw_dev_auth = values.get("UNFOG_DEV_AUTH_ENABLED", "false").strip().lower()
         if raw_dev_auth not in {"true", "false", "1", "0"}:
             raise SettingsError("UNFOG_DEV_AUTH_ENABLED must be true or false.")
+        if raw_dev_auth in {"true", "1"} and values.get("APP_ENV") != "development":
+            raise SettingsError(
+                "APP_ENV=development must be explicitly set when local authentication is enabled."
+            )
         raw_algorithms = values.get("OIDC_ALLOWED_ALGORITHMS", "RS256")
         algorithms = tuple(part.strip() for part in raw_algorithms.split(",") if part.strip())
 

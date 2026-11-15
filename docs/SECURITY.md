@@ -9,7 +9,8 @@ HTTPS issuer/JWKS configuration. Users are keyed only by the immutable
 `(issuer, subject)` identity pair; email is profile data and is never used to
 link accounts. Local bearer authentication is available only with the explicit
 `UNFOG_DEV_AUTH_ENABLED` development flag and a configured secret. Identity
-headers are not trusted.
+headers are not trusted. Local auth also requires an explicit
+`APP_ENV=development`; production and an unset environment name reject it.
 
 Repository, snapshot, and job reads filter through the owning user. A missing
 resource and a resource owned by another user return the same not-found

@@ -298,6 +298,16 @@ def test_settings_fail_closed_for_production_and_local_auth() -> None:
             dev_auth_email="dev@example.test",
         )
 
+    with pytest.raises(SettingsError, match="APP_ENV=development must be explicitly set"):
+        Settings.from_environment(
+            {
+                "DATABASE_URL": "sqlite://",
+                "UNFOG_DEV_AUTH_ENABLED": "true",
+                "UNFOG_DEV_AUTH_TOKEN": "x" * 40,
+                "UNFOG_DEV_AUTH_EMAIL": "dev@example.test",
+            }
+        )
+
 
 def test_missing_malformed_and_invalid_authentication_use_error_envelope(
     harness: AuthHarness,
