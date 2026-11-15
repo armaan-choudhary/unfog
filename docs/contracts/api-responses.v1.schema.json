@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:unfog:contract:api-responses:v1",
+  "title": "Unfog API Responses v1",
+  "oneOf": [
+    { "$ref": "#/$defs/errorEnvelope" },
+    { "$ref": "#/$defs/jobResponse" }
+  ],
+  "$defs": {
+    "uuidV4": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "requestId": { "$ref": "#/$defs/uuidV4" },
+    "jobId": { "$ref": "#/$defs/uuidV4" },
+    "repositoryId": { "$ref": "#/$defs/uuidV4" },
+    "snapshotId": {
+      "anyOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/uuidV4" }
+      ]
+    },
+    "errorEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "error"],
+      "properties": {
+        "schema_version": { "const": "1.0" },
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "message", "request_id", "retryable"],
+          "properties": {
+            "code": {
+              "enum": ["invalid_request", "unauthenticated", "forbidden", "not_found", "conflict", "rate_limited", "evidence_unavailable", "internal_error"]
+            },
+            "message": { "type": "string", "minLength": 1, "maxLength": 512 },
+            "request_id": { "$ref": "#/$defs/requestId" },
+            "retryable": { "type": "boolean" },
+            "issues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["code", "path"],
+                "properties": {
+                  "code": { "type": "string", "minLength": 1, "maxLength": 64 },
+                  "path": { "type": "string", "maxLength": 256 }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "jobFailure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message", "retryable"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "message": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "retryable": { "type": "boolean" }
+      }
+    },
+    "jobResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "job_id", "repository_id", "snapshot_id", "job_type", "status", "stage", "progress", "created_at", "updated_at", "completed_at", "error"],
+      "properties": {
+        "schema_version": { "const": "1.0" },
+        "job_id": { "$ref": "#/$defs/jobId" },
+        "repository_id": { "$ref": "#/$defs/repositoryId" },
+        "snapshot_id": { "$ref": "#/$defs/snapshotId" },
+        "job_type": { "enum": ["repository_import", "snapshot_index", "analysis", "journey_generation", "challenge_generation", "snapshot_comparison"] },
+        "status": { "enum": ["queued", "running", "succeeded", "failed", "cancelled"] },
+        "stage": { "enum": ["RECEIVED", "UNPACKING", "SCANNING", "PARSING", "RESOLVING", "GRAPH_READY", "AUTOPSY", "WORLD_READY", "COMPLETE"] },
+        "progress": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "completed_at": { "type": ["string", "null"], "format": "date-time" },
+        "error": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/jobFailure" }] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "failed" } }, "required": ["status"] },
+          "then": { "properties": { "error": { "$ref": "#/$defs/jobFailure" } } }
+        },
+        {
+          "if": { "properties": { "status": { "enum": ["queued", "running", "succeeded", "cancelled"] } }, "required": ["status"] },
+          "then": { "properties": { "error": { "type": "null" } } }
+        }
+      ]
+    }
+  }
+}
