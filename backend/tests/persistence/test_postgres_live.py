@@ -74,6 +74,8 @@ class LivePostgresPersistenceTests(unittest.TestCase):
                 session.commit()
                 self.assertEqual(valid_job.id.version, 4)
                 self.assertIsNotNone(snapshot.created_at)
+                owner_id = owner.id
+                repository_a_id = repository_a.id
 
                 session.add(
                     Job(
@@ -120,6 +122,95 @@ class LivePostgresPersistenceTests(unittest.TestCase):
                         {"hash": "sha256:" + ("b" * 64), "revision": "a" * 40},
                     )
 
+            # Exercise PostgreSQL constraints directly, without ORM validation.
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "UPDATE users SET auth_issuer = :issuer, auth_subject = :subject "
+                        "WHERE id = :id"
+                    ),
+                    {
+                        "issuer": "https://issuer.example.test",
+                        "subject": "stable-subject",
+                        "id": owner_id,
+                    },
+                )
+            with self.assertRaises(DBAPIError):
+                with engine.begin() as connection:
+                    connection.execute(
+                        text("UPDATE users SET auth_subject = 'changed' WHERE id = :id"),
+                        {"id": owner_id},
+                    )
+            with self.assertRaises(DBAPIError):
+                with engine.begin() as connection:
+                    connection.execute(
+                        text(
+                            "INSERT INTO users (id, email, auth_issuer) "
+                            "VALUES (:id, :email, :issuer)"
+                        ),
+                        {
+                            "id": uuid4(),
+                            "email": f"partial-{uuid4()}@example.test",
+                            "issuer": "https://issuer.example.test",
+                        },
+                    )
+            with self.assertRaises(DBAPIError):
+                with engine.begin() as connection:
+                    connection.execute(
+                        text(
+                            "INSERT INTO users (id, email, auth_issuer, auth_subject) "
+                            "VALUES (:id, :email, :issuer, :subject)"
+                        ),
+                        {
+                            "id": uuid4(),
+                            "email": f"duplicate-{uuid4()}@example.test",
+                            "issuer": "https://issuer.example.test",
+                            "subject": "stable-subject",
+                        },
+                    )
+
+            email_less_user_id = uuid4()
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "INSERT INTO users (id, auth_issuer, auth_subject) "
+                        "VALUES (:id, :issuer, :subject)"
+                    ),
+                    {
+                        "id": email_less_user_id,
+                        "issuer": "https://issuer.example.test",
+                        "subject": "email-less-subject",
+                    },
+                )
+            with self.assertRaisesRegex(RuntimeError, "users without email addresses"):
+                command.downgrade(config, "0001_initial_persistence")
+            with engine.begin() as connection:
+                connection.execute(
+                    text("DELETE FROM users WHERE id = :id"), {"id": email_less_user_id}
+                )
+
+            command.downgrade(config, "0001_initial_persistence")
+            downgraded = inspect(engine)
+            self.assertNotIn(
+                "auth_issuer", {column["name"] for column in downgraded.get_columns("users")}
+            )
+            with engine.connect() as connection:
+                self.assertEqual(
+                    connection.execute(
+                        text("SELECT count(*) FROM repositories WHERE id = :id"),
+                        {"id": repository_a_id},
+                    ).scalar_one(),
+                    1,
+                )
+                self.assertEqual(
+                    connection.execute(
+                        text("SELECT count(*) FROM users WHERE id = :id"),
+                        {"id": owner_id},
+                    ).scalar_one(),
+                    1,
+                )
+            command.upgrade(config, "head")
+
             command.downgrade(config, "base")
             downgraded = inspect(engine)
             self.assertFalse(
@@ -130,7 +221,12 @@ class LivePostgresPersistenceTests(unittest.TestCase):
                     text("SELECT count(*) FROM pg_proc WHERE proname = :name"),
                     {"name": "unfog_reject_snapshot_identity_change"},
                 ).scalar_one()
+                remaining_auth_functions = connection.execute(
+                    text("SELECT count(*) FROM pg_proc WHERE proname = :name"),
+                    {"name": "unfog_reject_user_auth_identity_change"},
+                ).scalar_one()
             self.assertEqual(remaining_trigger_functions, 0)
+            self.assertEqual(remaining_auth_functions, 0)
         finally:
             engine.dispose()
             if previous_url is None:
