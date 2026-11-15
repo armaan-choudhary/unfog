@@ -20,9 +20,13 @@ router = APIRouter(prefix="/api/v1/codebase", tags=["codebase"])
 )
 async def get_source_graph(
     service: Annotated[CodebaseService, Depends(get_codebase_service)],
+    repo_id: Annotated[
+        str | None,
+        Query(description="Repository identifier (defaults to active sample_service)"),
+    ] = None,
 ) -> SourceGraph:
     """Returns the static verified source graph of the indexed repository."""
-    return service.get_graph()
+    return service.get_graph(repo_id=repo_id)
 
 
 @router.get(
@@ -42,6 +46,10 @@ async def get_source_file(
         ),
     ],
     service: Annotated[CodebaseService, Depends(get_codebase_service)],
+    repo_id: Annotated[
+        str | None,
+        Query(description="Repository identifier (defaults to active sample_service)"),
+    ] = None,
 ) -> FileDetailResponse:
     """Returns file source content and symbol definitions."""
-    return service.get_file(path)
+    return service.get_file(relative_path=path, repo_id=repo_id)

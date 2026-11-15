@@ -26,7 +26,7 @@ export interface LineRange {
 }
 
 export interface SnapshotRevision {
-  kind: "git_commit" | "content_manifest";
+  kind: "git_commit" | "content_manifest" | "local_tree";
   value: string;
 }
 
@@ -116,6 +116,7 @@ export interface AiExplainRequest {
   path: string;
   symbol_name: string;
   prompt?: string;
+  repo_id?: string;
 }
 
 export interface AiExplainResponse {
@@ -137,6 +138,7 @@ export interface AiChatRequest {
   active_node_id?: string;
   active_path?: string;
   history?: Array<{ role: "user" | "model"; content: string }>;
+  repo_id?: string;
 }
 
 export interface AiChatResponse {
@@ -159,6 +161,7 @@ export interface ChallengeEvaluationRequest {
   answer: string;
   selected_symbol_id?: string;
   selected_path?: string;
+  repo_id?: string;
 }
 
 export interface ChallengeEvaluationResponse {
@@ -166,4 +169,21 @@ export interface ChallengeEvaluationResponse {
   score: number;
   feedback: string;
   citations: CitationRef[];
+}
+
+export interface GithubImportResponse {
+  repo_id: string;
+  owner: string;
+  repo: string;
+  commit_sha: string;
+  default_branch: string;
+  file_count: number;
+}
+
+export interface RepositoryOption {
+  id: string;
+  name: string;
+  owner?: string;
+  repo?: string;
+  isBundled?: boolean;
 }

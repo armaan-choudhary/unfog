@@ -10,12 +10,14 @@ import styles from "./AiCompanionTab.module.css";
 
 interface AiCompanionTabProps {
   selectedNode: CodebaseNodeData | null;
+  repoId?: string;
   onNavigateCitation: (citation: CitationRef) => void;
   initialPrompt?: string;
 }
 
 export function AiCompanionTab({
   selectedNode,
+  repoId,
   onNavigateCitation,
   initialPrompt,
 }: AiCompanionTabProps) {
@@ -23,19 +25,11 @@ export function AiCompanionTab({
     {
       role: "model",
       content:
-        "👋 Welcome! I am your Gemini Codebase Companion. Ask me anything about `sample_service`, or click any symbol to see grounded architectural explanations with verified code citations.",
-      citations: [
-        {
-          path: "service/auth.py",
-          range: { start_line: 41, end_line: 71 },
-          snippet: "verify_token implementation",
-        },
-      ],
+        "👋 Welcome! I am your Gemini Codebase Companion. Ask me anything about this repository, or click any symbol or file on the map to see grounded architectural explanations with verified code citations.",
     },
   ]);
   const [inputVal, setInputVal] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [activeModel, setActiveModel] = useState<string>("gemini-2.5-flash");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom of messages
@@ -50,10 +44,9 @@ export function AiCompanionTab({
     const node = selectedNode;
     let isCancelled = false;
 
-    explainSymbol(node.path, node.name, node.id, prompt)
+    explainSymbol(node.path, node.name, node.id, prompt, repoId)
       .then((res) => {
         if (!isCancelled) {
-          if (res.model) setActiveModel(res.model);
           setMessages((prev) => [
             ...prev,
             { role: "user", content: prompt },
@@ -61,7 +54,6 @@ export function AiCompanionTab({
               role: "model",
               content: res.explanation,
               citations: res.citations,
-              model: res.model,
             },
           ]);
         }
@@ -83,7 +75,7 @@ export function AiCompanionTab({
     return () => {
       isCancelled = true;
     };
-  }, [initialPrompt, selectedNode]);
+  }, [initialPrompt, selectedNode, repoId]);
 
   const handleSendMessage = async (msgText: string) => {
     if (!msgText.trim() || isLoading) return;
@@ -104,16 +96,15 @@ export function AiCompanionTab({
         selectedNode?.id,
         selectedNode?.path,
         history,
+        repoId,
       );
 
-      if (res.model) setActiveModel(res.model);
       setMessages((prev) => [
         ...prev,
         {
           role: "model",
           content: res.reply,
           citations: res.citations,
-          model: res.model,
         },
       ]);
     } catch {
@@ -137,40 +128,124 @@ export function AiCompanionTab({
     }
   };
 
-  // Helper to render formatted markdown-like text
+  // Helper to parse inline markdown (bold text, inline code)
+  const renderInline = (text: string): React.ReactNode[] => {
+    const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith("`") && part.endsWith("`") && part.length > 2) {
+        return (
+          <code
+            key={i}
+            style={{
+              backgroundColor: "var(--color-panel)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "4px",
+              padding: "0.1rem 0.35rem",
+              fontFamily: "ui-monospace, monospace",
+              fontSize: "0.825em",
+              color: "var(--color-accent-teal)",
+            }}
+          >
+            {part.slice(1, -1)}
+          </code>
+        );
+      }
+      if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+        return (
+          <strong
+            key={i}
+            style={{ color: "var(--color-text)", fontWeight: 600 }}
+          >
+            {part.slice(2, -2)}
+          </strong>
+        );
+      }
+      return part;
+    });
+  };
+
+  // Helper to render structured markdown
   const renderFormattedContent = (content: string) => {
     const lines = content.split("\n");
-    return lines.map((line, idx) => {
+    const elements: React.ReactNode[] = [];
+    let inCodeBlock = false;
+    let codeBlockLines: string[] = [];
+    let codeBlockKey = 0;
+
+    for (let idx = 0; idx < lines.length; idx++) {
+      const line = lines[idx];
+
+      // Code block start / end
+      if (line.trim().startsWith("```")) {
+        if (inCodeBlock) {
+          elements.push(
+            <pre
+              key={`code-${codeBlockKey++}`}
+              style={{
+                backgroundColor: "var(--color-canvas)",
+                border: "1px solid var(--color-border)",
+                borderRadius: "6px",
+                padding: "0.6rem 0.8rem",
+                overflowX: "auto",
+                fontSize: "0.775rem",
+                fontFamily: "ui-monospace, monospace",
+                margin: "0.4rem 0",
+              }}
+            >
+              <code>{codeBlockLines.join("\n")}</code>
+            </pre>,
+          );
+          codeBlockLines = [];
+          inCodeBlock = false;
+        } else {
+          inCodeBlock = true;
+          codeBlockLines = [];
+        }
+        continue;
+      }
+
+      if (inCodeBlock) {
+        codeBlockLines.push(line);
+        continue;
+      }
+
+      // Headings
       if (line.startsWith("### ")) {
-        return (
+        elements.push(
           <h4
             key={idx}
             style={{
-              margin: "0.4rem 0 0.2rem",
+              margin: "0.5rem 0 0.25rem",
               color: "var(--color-accent-teal)",
               fontSize: "0.9rem",
+              fontWeight: 700,
             }}
           >
-            {line.replace("### ", "")}
-          </h4>
+            {renderInline(line.replace("### ", ""))}
+          </h4>,
         );
+        continue;
       }
       if (line.startsWith("## ")) {
-        return (
+        elements.push(
           <h3
             key={idx}
             style={{
-              margin: "0.5rem 0 0.25rem",
+              margin: "0.6rem 0 0.3rem",
               color: "var(--color-accent-violet)",
               fontSize: "0.95rem",
+              fontWeight: 700,
             }}
           >
-            {line.replace("## ", "")}
-          </h3>
+            {renderInline(line.replace("## ", ""))}
+          </h3>,
         );
+        continue;
       }
+
+      // Bullet lists
       if (line.startsWith("- ") || line.startsWith("* ")) {
-        return (
+        elements.push(
           <div
             key={idx}
             style={{
@@ -178,45 +253,76 @@ export function AiCompanionTab({
               margin: "0.15rem 0",
               display: "flex",
               gap: "0.4rem",
+              alignItems: "baseline",
             }}
           >
-            <span style={{ color: "var(--color-accent-violet)" }}>•</span>
-            <span>{line.substring(2)}</span>
-          </div>
+            <span
+              style={{
+                color: "var(--color-accent-violet)",
+                fontSize: "0.8rem",
+              }}
+            >
+              •
+            </span>
+            <span>{renderInline(line.substring(2))}</span>
+          </div>,
         );
+        continue;
       }
+
+      // Numbered lists (e.g. "1. Step")
+      const numMatch = line.match(/^(\d+)\.\s+(.*)$/);
+      if (numMatch) {
+        elements.push(
+          <div
+            key={idx}
+            style={{
+              paddingLeft: "0.75rem",
+              margin: "0.15rem 0",
+              display: "flex",
+              gap: "0.4rem",
+              alignItems: "baseline",
+            }}
+          >
+            <span
+              style={{
+                color: "var(--color-accent-violet)",
+                fontSize: "0.75rem",
+                fontWeight: 600,
+              }}
+            >
+              {numMatch[1]}.
+            </span>
+            <span>{renderInline(numMatch[2])}</span>
+          </div>,
+        );
+        continue;
+      }
+
+      // Empty line spacing
       if (!line.trim()) {
-        return <div key={idx} style={{ height: "0.4rem" }} />;
+        elements.push(<div key={idx} style={{ height: "0.35rem" }} />);
+        continue;
       }
-      return (
+
+      // Regular paragraph
+      elements.push(
         <p key={idx} style={{ margin: "0.2rem 0" }}>
-          {line}
-        </p>
+          {renderInline(line)}
+        </p>,
       );
-    });
+    }
+
+    return elements;
   };
 
   return (
     <div className={styles.container}>
       {/* Header with Model info */}
       <div className={styles.aiHeader}>
-        <div
-          className={styles.modelBadge}
-          style={
-            activeModel.includes("offline") || activeModel.includes("fallback")
-              ? {
-                  borderColor: "var(--color-accent-amber)",
-                  color: "var(--color-accent-amber)",
-                }
-              : undefined
-          }
-        >
+        <div className={styles.modelBadge}>
           <Sparkles size={12} />
-          <span>
-            {activeModel.includes("offline") || activeModel.includes("fallback")
-              ? "Deterministic Offline Engine"
-              : activeModel}
-          </span>
+          <span>Gemini 2.5 Flash</span>
         </div>
         <div
           style={{
@@ -241,26 +347,32 @@ export function AiCompanionTab({
             handleSendMessage(
               selectedNode
                 ? `Explain ${selectedNode.name} in ${selectedNode.path}`
-                : "Explain token verification in auth.py",
+                : "Explain the main entrypoint and architecture of this repository",
             )
           }
         >
-          {selectedNode ? `Explain ${selectedNode.name}` : "Explain auth.py"}
+          {selectedNode
+            ? `Explain ${selectedNode.name}`
+            : "Explain Architecture"}
         </button>
         <button
           type="button"
           className={styles.chipBtn}
           onClick={() =>
-            handleSendMessage("How does OrderProcessor process orders?")
+            handleSendMessage(
+              "How does the primary data flow and execution pipeline work?",
+            )
           }
         >
-          Trace order flow
+          Trace execution flow
         </button>
         <button
           type="button"
           className={styles.chipBtn}
           onClick={() =>
-            handleSendMessage("Where are domain errors and exceptions defined?")
+            handleSendMessage(
+              "Where are domain errors and exceptions defined and handled?",
+            )
           }
         >
           Error handling
@@ -269,10 +381,12 @@ export function AiCompanionTab({
           type="button"
           className={styles.chipBtn}
           onClick={() =>
-            handleSendMessage("How is calculate_fee implemented in pricing.py?")
+            handleSendMessage(
+              "What dependencies and external packages does this codebase rely on?",
+            )
           }
         >
-          Pricing fee logic
+          Dependencies
         </button>
       </div>
 

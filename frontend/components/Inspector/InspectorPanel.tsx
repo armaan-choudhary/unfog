@@ -13,6 +13,7 @@ export type InspectorTab = "source" | "ai" | "learning";
 
 interface InspectorPanelProps {
   selectedNode: CodebaseNodeData | null;
+  repoId?: string;
   activeTab: InspectorTab;
   onChangeTab: (tab: InspectorTab) => void;
   onNavigateCitation: (citation: CitationRef) => void;
@@ -20,6 +21,7 @@ interface InspectorPanelProps {
 
 export function InspectorPanel({
   selectedNode,
+  repoId,
   activeTab,
   onChangeTab,
   onNavigateCitation,
@@ -133,6 +135,7 @@ export function InspectorPanel({
           {activeTab === "source" && (
             <SourceInspectorTab
               selectedNode={selectedNode}
+              repoId={repoId}
               onAskAi={handleAskAiFromSource}
             />
           )}
@@ -140,13 +143,17 @@ export function InspectorPanel({
           {activeTab === "ai" && (
             <AiCompanionTab
               selectedNode={selectedNode}
+              repoId={repoId}
               onNavigateCitation={onNavigateCitation}
               initialPrompt={aiInitialPrompt}
             />
           )}
 
           {activeTab === "learning" && (
-            <LearningArenaTab onNavigateCitation={onNavigateCitation} />
+            <LearningArenaTab
+              repoId={repoId}
+              onNavigateCitation={onNavigateCitation}
+            />
           )}
         </div>
       )}

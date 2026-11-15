@@ -38,6 +38,9 @@ class EvaluateRequest(BaseModel):
     selected_path: str | None = Field(
         default=None, description="Optional source file path selected by user"
     )
+    repo_id: str | None = Field(
+        default=None, description="Optional repository identifier for multi-repo support"
+    )
 
 
 class EvaluateResponse(BaseModel):

@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { SourceGraph, CitationRef } from "../lib/types";
+import {
+  SourceGraph,
+  CitationRef,
+  RepositoryOption,
+  GithubImportResponse,
+} from "../lib/types";
 import {
   fetchSourceGraph,
   subscribeConnectionStatus,
@@ -17,10 +22,19 @@ import {
 import { CodebaseNodeData } from "../components/Map/CustomNode";
 
 export default function DashboardPage() {
+  const [repositories, setRepositories] = useState<RepositoryOption[]>([
+    {
+      id: "sample_service",
+      name: "sample_service",
+      isBundled: true,
+    },
+  ]);
+  const [selectedRepoId, setSelectedRepoId] =
+    useState<string>("sample_service");
   const [graph, setGraph] = useState<SourceGraph>(MOCK_SOURCE_GRAPH);
   const [selectedNode, setSelectedNode] = useState<CodebaseNodeData | null>(
     () => {
-      // Default initial selection to verify_token
+      // Default initial selection to verify_token for sample_service
       const firstSym = MOCK_SOURCE_GRAPH.symbols[0];
       const firstFile = MOCK_SOURCE_GRAPH.files.find(
         (f) => f.id === firstSym?.file_id,
@@ -48,14 +62,14 @@ export default function DashboardPage() {
 
   // Load graph on mount and listen to backend status
   const loadGraph = useCallback(() => {
-    fetchSourceGraph()
+    fetchSourceGraph(selectedRepoId)
       .then((data) => {
         setGraph(data);
       })
       .catch((err) => {
         console.warn("Failed to fetch source graph:", err);
       });
-  }, []);
+  }, [selectedRepoId]);
 
   useEffect(() => {
     let isSubscribed = true;
@@ -63,7 +77,7 @@ export default function DashboardPage() {
       if (isSubscribed) setConnectionStatus(status);
     });
 
-    fetchSourceGraph()
+    fetchSourceGraph("sample_service")
       .then((data) => {
         if (isSubscribed) {
           setGraph(data);
@@ -98,6 +112,43 @@ export default function DashboardPage() {
       unsub();
     };
   }, []);
+
+  // Handler for switching active repository
+  const handleSelectRepo = useCallback((repoId: string) => {
+    setSelectedRepoId(repoId);
+    setSelectedNode(null);
+    setHighlightedPath(undefined);
+    setActiveTab("source");
+
+    fetchSourceGraph(repoId)
+      .then((data) => {
+        setGraph(data);
+      })
+      .catch((err) => {
+        console.error("Failed to switch repository graph:", err);
+      });
+  }, []);
+
+  // Handler when a new GitHub repository is imported
+  const handleImportSuccess = useCallback(
+    (imported: GithubImportResponse) => {
+      const newOption: RepositoryOption = {
+        id: imported.repo_id,
+        name: `${imported.owner}/${imported.repo}`,
+        owner: imported.owner,
+        repo: imported.repo,
+        isBundled: false,
+      };
+
+      setRepositories((prev) => {
+        const exists = prev.some((r) => r.id === imported.repo_id);
+        return exists ? prev : [...prev, newOption];
+      });
+
+      handleSelectRepo(imported.repo_id);
+    },
+    [handleSelectRepo],
+  );
 
   // Handler when a user selects a node from the React Flow canvas
   const handleSelectNode = useCallback((nodeData: CodebaseNodeData) => {
@@ -154,7 +205,10 @@ export default function DashboardPage() {
     <div className="appContainer">
       {/* Top Header */}
       <Header
-        repoName={graph.snapshot.repository_name || "sample_service"}
+        selectedRepoId={selectedRepoId}
+        repositories={repositories}
+        onSelectRepo={handleSelectRepo}
+        onImportSuccess={handleImportSuccess}
         filesCount={graph.files.length}
         symbolsCount={graph.symbols.length}
         edgesCount={graph.edges.length}
@@ -172,7 +226,9 @@ export default function DashboardPage() {
         />
 
         <InspectorPanel
+          key={selectedRepoId}
           selectedNode={selectedNode}
+          repoId={selectedRepoId}
           activeTab={activeTab}
           onChangeTab={setActiveTab}
           onNavigateCitation={handleNavigateCitation}

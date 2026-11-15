@@ -6,6 +6,7 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 from app.codeintel.hasher import (
+    compute_content_hash,
     compute_manifest_hash,
     compute_range_hash,
 )
@@ -20,7 +21,12 @@ from app.codeintel.models import (
     SourceGraph,
     SourceSymbol,
 )
-from app.codeintel.parser import ParsedModule, RawSymbol, parse_python_source
+from app.codeintel.parser import (
+    ParsedModule,
+    RawSymbol,
+    parse_python_source,
+    path_to_module_name,
+)
 
 
 def _scan_directory(
@@ -31,20 +37,39 @@ def _scan_directory(
     ignored_parts = {
         "__pycache__",
         ".git",
+        ".github",
         ".pytest_cache",
         ".ruff_cache",
         ".mypy_cache",
         "node_modules",
         ".venv",
         "venv",
+        "env",
+        ".env",
+        ".tox",
+        ".nox",
+        "dist",
+        "build",
+        "site-packages",
+        ".eggs",
     }
     for file_path in sorted(root_dir.glob("**/*.py")):
-        if any(part in ignored_parts for part in file_path.parts):
+        if any(
+            part in ignored_parts or (part.startswith(".") and part != ".")
+            for part in file_path.parts[:-1]
+        ):
+            continue
+        if file_path.name.startswith("."):
             continue
         rel_posix = str(file_path.relative_to(root_dir)).replace("\\", "/")
         try:
             content = file_path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
+            try:
+                content = file_path.read_text(encoding="utf-8", errors="replace")
+            except Exception:
+                continue
+        except Exception:
             continue
         files.append((rel_posix, file_path, content))
     return files
@@ -64,7 +89,18 @@ def build_source_graph(
 
     parsed_modules: dict[str, ParsedModule] = {}
     for rel_path, _, content in scanned_files:
-        parsed_modules[rel_path] = parse_python_source(rel_path, content)
+        try:
+            parsed_modules[rel_path] = parse_python_source(rel_path, content)
+        except SyntaxError:
+            lines = content.splitlines()
+            parsed_modules[rel_path] = ParsedModule(
+                path=rel_path,
+                module_name=path_to_module_name(rel_path),
+                content=content,
+                content_hash=compute_content_hash(content),
+                line_count=len(lines),
+                tree_sitter_valid=False,
+            )
 
     # 1. Build SourceFile records
     file_records: list[SourceFile] = []
@@ -215,10 +251,13 @@ def build_source_graph(
             if imp.name == imp.module:
                 call_import_map[imp.alias] = imp.module
 
-        # Known module instances in sample service
-        instance_type_map = {
-            "order_manager": "service.orders.OrderManager",
-        }
+        # Dynamically resolve instance variable classes from module assignments
+        instance_type_map: dict[str, str] = {}
+        for var_name, class_name in parsed.assigned_instances.items():
+            if class_name in call_import_map:
+                instance_type_map[var_name] = call_import_map[class_name]
+            else:
+                instance_type_map[var_name] = f"{parsed.module_name}.{class_name}"
 
         for call in parsed.calls:
             caller_sym = symbol_by_qualified.get(call.caller_qualified_name)

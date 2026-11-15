@@ -10,8 +10,19 @@ def get_deterministic_explanation(
     symbol_name: str | None,
     prompt: str | None,
     context: RetrievedContext,
+    repo_id: str | None = None,
 ) -> str:
     """Generate a high-quality, grounded explanation when Gemini is offline or unconfigured."""
+    if repo_id and repo_id not in ("sample_service", "bundled"):
+        line_info = f"lines {context.range.start_line}–{context.range.end_line}"
+        header = f"Code analysis for `{symbol_name or path}` in repository `{repo_id}`"
+        return (
+            f"{header} ({path}, {line_info}):\n\n"
+            f"This symbol defines the {symbol_name or 'module'} implementation. "
+            "In offline fallback mode, automated generative explanations are disabled. "
+            "Refer to the exact source lines cited above for implementation logic."
+        )
+
     p = path.lower()
     s = (symbol_name or "").lower()
 
@@ -24,12 +35,12 @@ def get_deterministic_explanation(
             "decoded claims payload; otherwise, it raises an `AuthenticationError`."
         )
 
-    if "order" in p or s == "process_order":
+    if "order" in p or s in ("create_order", "process_order"):
         return (
-            "The `process_order` function in `service/orders.py` orchestrates the order lifecycle. "
+            "The `create_order` method in `service/orders.py` orchestrates the order lifecycle. "
             "It begins by validating caller identity via `verify_token`, validates order schema, "
             "calculates necessary shipping and processing fees via `calculate_fee` in "
-            "`service/pricing.py`, and finally yields a confirmed `OrderResult` with a UUID."
+            "`service/pricing.py`, and finally yields a confirmed order record with a UUID."
         )
 
     if "pricing" in p or s == "calculate_fee":
@@ -60,8 +71,18 @@ def get_deterministic_chat_reply(
     message: str,
     active_path: str | None,
     citations: list[RetrievedContext],
+    repo_id: str | None = None,
 ) -> str:
     """Generate a deterministic, grounded response for codebase Q&A."""
+    if repo_id and repo_id not in ("sample_service", "bundled"):
+        primary = citations[0] if citations else None
+        ref_text = f" in `{primary.path}`" if primary else ""
+        return (
+            f"Repository `{repo_id}` query analysis: The relevant implementation{ref_text} manages "
+            "the requested behavior. In offline fallback mode, generative chat is disabled. "
+            "See the cited source lines for the exact implementation details."
+        )
+
     m = message.lower()
 
     if any(k in m for k in ("error", "exception", "fault")):

@@ -5,6 +5,7 @@ import {
   AiChatResponse,
   LearningChallenge,
   ChallengeEvaluationResponse,
+  GithubImportResponse,
 } from "./types";
 import {
   MOCK_SOURCE_GRAPH,
@@ -39,9 +40,68 @@ function updateStatus(status: ConnectionStatus) {
   }
 }
 
-export async function fetchSourceGraph(): Promise<SourceGraph> {
+export async function importGithubRepo(
+  url: string,
+): Promise<GithubImportResponse> {
+  const res = await fetch(`${BASE_URL}/api/v1/github/import`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({ url }),
+  });
+
+  if (!res.ok) {
+    let errorDetail = "";
+    try {
+      const errData = await res.json();
+      errorDetail =
+        errData.detail || errData.message || JSON.stringify(errData);
+    } catch {
+      errorDetail = res.statusText;
+    }
+
+    if (res.status === 400) {
+      throw new Error(
+        errorDetail ||
+          "Invalid GitHub URL. Must be in the format https://github.com/owner/repository",
+      );
+    } else if (res.status === 404) {
+      throw new Error(
+        errorDetail || "Repository not found or is private on GitHub.",
+      );
+    } else if (res.status === 413) {
+      throw new Error(
+        errorDetail ||
+          "Repository archive exceeds size limits (max 25MB archive / 100MB uncompressed).",
+      );
+    } else if (res.status === 429) {
+      throw new Error(
+        errorDetail || "GitHub API rate limit reached. Please try again later.",
+      );
+    } else if (res.status === 422) {
+      throw new Error(
+        errorDetail || "No supported Python source files found in repository.",
+      );
+    } else {
+      throw new Error(
+        errorDetail || `Import failed with status code ${res.status}`,
+      );
+    }
+  }
+
+  updateStatus("connected");
+  return (await res.json()) as GithubImportResponse;
+}
+
+export async function fetchSourceGraph(repoId?: string): Promise<SourceGraph> {
   try {
-    const res = await fetch(`${BASE_URL}/api/v1/codebase/graph`, {
+    const query =
+      repoId && repoId !== "sample_service"
+        ? `?repo_id=${encodeURIComponent(repoId)}`
+        : "";
+    const res = await fetch(`${BASE_URL}/api/v1/codebase/graph${query}`, {
       headers: { Accept: "application/json" },
       cache: "no-store",
     });
@@ -59,17 +119,25 @@ export async function fetchSourceGraph(): Promise<SourceGraph> {
       "Live backend /api/v1/codebase/graph not reachable, using grounded mock data:",
       err,
     );
-    updateStatus("offline_mock");
-    return MOCK_SOURCE_GRAPH;
+    if (!repoId || repoId === "sample_service") {
+      updateStatus("offline_mock");
+      return MOCK_SOURCE_GRAPH;
+    }
+    throw err;
   }
 }
 
 export async function fetchFileDetail(
   filePath: string,
+  repoId?: string,
 ): Promise<FileDetailResponse> {
   try {
+    const repoParam =
+      repoId && repoId !== "sample_service"
+        ? `&repo_id=${encodeURIComponent(repoId)}`
+        : "";
     const res = await fetch(
-      `${BASE_URL}/api/v1/codebase/file?path=${encodeURIComponent(filePath)}`,
+      `${BASE_URL}/api/v1/codebase/file?path=${encodeURIComponent(filePath)}${repoParam}`,
       {
         headers: { Accept: "application/json" },
       },
@@ -84,9 +152,11 @@ export async function fetchFileDetail(
     }
     throw new Error("Invalid file payload");
   } catch {
-    // Return grounded mock data
-    if (MOCK_FILE_CONTENTS[filePath]) {
-      return MOCK_FILE_CONTENTS[filePath];
+    // Return grounded mock data for sample_service
+    if (!repoId || repoId === "sample_service") {
+      if (MOCK_FILE_CONTENTS[filePath]) {
+        return MOCK_FILE_CONTENTS[filePath];
+      }
     }
     // Generic fallback for any unlisted file
     return {
@@ -105,6 +175,7 @@ export async function explainSymbol(
   symbolName: string,
   symbolId?: string,
   prompt?: string,
+  repoId?: string,
 ): Promise<AiExplainResponse> {
   try {
     const res = await fetch(`${BASE_URL}/api/v1/ai/explain`, {
@@ -115,6 +186,7 @@ export async function explainSymbol(
         path,
         symbol_name: symbolName,
         prompt: prompt || `Explain ${symbolName} in ${path}`,
+        repo_id: repoId && repoId !== "sample_service" ? repoId : undefined,
       }),
     });
     if (!res.ok) {
@@ -146,6 +218,7 @@ export async function sendAiChat(
   activeNodeId?: string,
   activePath?: string,
   history?: Array<{ role: "user" | "model"; content: string }>,
+  repoId?: string,
 ): Promise<AiChatResponse> {
   try {
     const res = await fetch(`${BASE_URL}/api/v1/ai/chat`, {
@@ -156,6 +229,7 @@ export async function sendAiChat(
         active_node_id: activeNodeId,
         active_path: activePath,
         history,
+        repo_id: repoId && repoId !== "sample_service" ? repoId : undefined,
       }),
     });
     if (!res.ok) {
@@ -204,9 +278,15 @@ export async function sendAiChat(
   }
 }
 
-export async function fetchChallenges(): Promise<LearningChallenge[]> {
+export async function fetchChallenges(
+  repoId?: string,
+): Promise<LearningChallenge[]> {
   try {
-    const res = await fetch(`${BASE_URL}/api/v1/learning/challenges`, {
+    const query =
+      repoId && repoId !== "sample_service"
+        ? `?repo_id=${encodeURIComponent(repoId)}`
+        : "";
+    const res = await fetch(`${BASE_URL}/api/v1/learning/challenges${query}`, {
       headers: { Accept: "application/json" },
     });
     if (!res.ok) {
@@ -225,6 +305,7 @@ export async function evaluateChallenge(
   answer: string,
   selectedSymbolId?: string,
   selectedPath?: string,
+  repoId?: string,
 ): Promise<ChallengeEvaluationResponse> {
   try {
     const res = await fetch(
@@ -236,6 +317,7 @@ export async function evaluateChallenge(
           answer,
           selected_symbol_id: selectedSymbolId,
           selected_path: selectedPath,
+          repo_id: repoId && repoId !== "sample_service" ? repoId : undefined,
         }),
       },
     );

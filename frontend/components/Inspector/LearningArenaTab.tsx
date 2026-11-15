@@ -19,10 +19,12 @@ import { CitationBadge } from "../Common/CitationBadge";
 import styles from "./LearningArenaTab.module.css";
 
 interface LearningArenaTabProps {
+  repoId?: string;
   onNavigateCitation: (citation: CitationRef) => void;
 }
 
 export function LearningArenaTab({
+  repoId,
   onNavigateCitation,
 }: LearningArenaTabProps) {
   const [challenges, setChallenges] = useState<LearningChallenge[]>([]);
@@ -36,16 +38,19 @@ export function LearningArenaTab({
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    fetchChallenges()
+    fetchChallenges(repoId)
       .then((data) => {
         if (data && data.length > 0) {
           setChallenges(data);
+          setActiveIdx(0);
+          setSelectedOption("");
+          setResult(null);
         }
       })
       .catch((err) => {
         console.error("Failed to load challenges:", err);
       });
-  }, []);
+  }, [repoId]);
 
   const activeChallenge = challenges[activeIdx];
 
@@ -66,6 +71,7 @@ export function LearningArenaTab({
         selectedOption,
         undefined,
         activeChallenge.target_path,
+        repoId,
       );
       setResult(evalRes);
 
@@ -112,20 +118,16 @@ export function LearningArenaTab({
       <div className={styles.arenaHeader}>
         <div className={styles.goalTitle}>
           <Trophy size={16} style={{ color: "var(--color-accent-amber)" }} />
-          <span>Architecture Mastery</span>
+          <span>Active Learning Challenges</span>
           <span
             style={{
               marginLeft: "auto",
               fontSize: "0.75rem",
               color: "var(--color-accent-teal)",
-              fontWeight: 600,
-              backgroundColor: "rgba(113, 194, 189, 0.15)",
-              padding: "0.2rem 0.5rem",
-              borderRadius: "0.375rem",
-              border: "1px solid rgba(113, 194, 189, 0.3)",
+              fontWeight: 700,
             }}
           >
-            Verified: {completedIds.size} / {challenges.length}
+            {completedIds.size} / {challenges.length} Solved
           </span>
         </div>
         <p className={styles.goalDescription}>
@@ -176,8 +178,7 @@ export function LearningArenaTab({
 
         <div className={styles.optionsList}>
           {activeChallenge.options.map((opt) => (
-            <button
-              type="button"
+            <div
               key={opt}
               className={`${styles.optionItem} ${
                 selectedOption === opt ? styles.selected : ""
@@ -188,26 +189,28 @@ export function LearningArenaTab({
                 {selectedOption === opt && <div className={styles.innerDot} />}
               </div>
               <span>{opt}</span>
-            </button>
+            </div>
           ))}
         </div>
 
-        <div>
-          <button
-            type="button"
-            className={styles.hintToggle}
-            onClick={() => setShowHint(!showHint)}
-          >
-            <HelpCircle
-              size={12}
-              style={{ display: "inline", marginRight: 4 }}
-            />
-            {showHint ? "Hide Hint" : "Need a hint?"}
-          </button>
-          {showHint && (
-            <div className={styles.hintBox}>{activeChallenge.hint}</div>
-          )}
-        </div>
+        {activeChallenge.hint && (
+          <div>
+            <button
+              type="button"
+              className={styles.hintToggle}
+              onClick={() => setShowHint(!showHint)}
+            >
+              <HelpCircle
+                size={12}
+                style={{ display: "inline", marginRight: 4 }}
+              />
+              {showHint ? "Hide Hint" : "Need a hint?"}
+            </button>
+            {showHint && (
+              <div className={styles.hintBox}>{activeChallenge.hint}</div>
+            )}
+          </div>
+        )}
 
         <button
           type="button"
@@ -241,8 +244,8 @@ export function LearningArenaTab({
                 )}
                 <span>
                   {result.is_correct
-                    ? "Correct — understanding verified"
-                    : "Needs review — re-trace code evidence"}
+                    ? `Correct (+${result.score} pts)`
+                    : "Incorrect"}
                 </span>
               </div>
               {result.is_correct && activeIdx < challenges.length - 1 && (

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
@@ -137,3 +139,50 @@ def test_learning_evaluate_not_found(client: TestClient) -> None:
         json=payload,
     )
     assert response.status_code == 404
+
+
+def test_api_endpoints_with_repo_id(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    temp_dir = tmp_path / "sample_imported_repo"
+    temp_dir.mkdir()
+    service_file = temp_dir / "app.py"
+    service_file.write_text("def start():\n    return 'started'\n", encoding="utf-8")
+
+    def fake_find_repo_root(repo_id: str | None = None):
+        if repo_id == "my_test_repo":
+            return temp_dir
+        from app.ai.context import find_sample_repo_root
+
+        return find_sample_repo_root()
+
+    monkeypatch.setattr("app.ai.context.find_repo_root", fake_find_repo_root)
+
+    # 1. AI Explain with repo_id
+    explain_payload = {
+        "path": "app.py",
+        "symbol_name": "start",
+        "repo_id": "my_test_repo",
+    }
+    resp = client.post("/api/v1/ai/explain", json=explain_payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["model"] == "offline-fallback"
+    assert data["citations"][0]["path"] == "app.py"
+
+    # 2. AI Chat with repo_id
+    chat_payload = {
+        "message": "how does app start?",
+        "active_path": "app.py",
+        "repo_id": "my_test_repo",
+    }
+    resp_chat = client.post("/api/v1/ai/chat", json=chat_payload)
+    assert resp_chat.status_code == 200
+    assert resp_chat.json()["model"] == "offline-fallback"
+
+    # 3. Learning challenges query with repo_id
+    resp_ch = client.get("/api/v1/learning/challenges?repo_id=sample_service")
+    assert resp_ch.status_code == 200
+    assert len(resp_ch.json()) >= 3

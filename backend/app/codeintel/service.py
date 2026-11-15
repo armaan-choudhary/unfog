@@ -1,15 +1,19 @@
-"""Codebase service providing cached graph index and safe file content inspection."""
+"""Codebase service providing multi-repository graph indexing and safe file inspection."""
 
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from threading import Lock
+from typing import Any
 
 from app.codeintel.hasher import compute_content_hash
 from app.codeintel.models import FileDetailResponse, FileSymbolSummary, SourceGraph
 from app.codeintel.scanner import build_source_graph
 from app.core.errors import ApplicationError, ErrorCode
+
+DEFAULT_REPO_ID = "sample_service"
 
 
 def find_sample_service_dir() -> Path:
@@ -31,30 +35,118 @@ def find_sample_service_dir() -> Path:
     return candidates[-1]
 
 
+@dataclass
+class RepositoryEntry:
+    repo_id: str
+    root_dir: Path
+    repository_name: str
+    graph: SourceGraph | None = None
+
+
 class CodebaseService:
-    """Thread-safe service managing codebase graph state and source inspection."""
+    """Thread-safe multi-repository manager for codebase graph state and source inspection."""
 
     def __init__(
         self,
         root_dir: Path | None = None,
         repository_name: str = "sample_service",
     ) -> None:
-        self.root_dir = root_dir if root_dir is not None else find_sample_service_dir()
-        self.repository_name = repository_name
-        self._graph: SourceGraph | None = None
+        self.default_root_dir = root_dir if root_dir is not None else find_sample_service_dir()
+        self.default_repo_name = repository_name
         self._lock = Lock()
+        self._repos: dict[str, RepositoryEntry] = {}
 
-    def get_graph(self, refresh: bool = False) -> SourceGraph:
-        """Returns the active SourceGraph, generating and caching it if needed."""
+        # Register default bundled repository
+        self._repos[DEFAULT_REPO_ID] = RepositoryEntry(
+            repo_id=DEFAULT_REPO_ID,
+            root_dir=self.default_root_dir,
+            repository_name=self.default_repo_name,
+        )
+
+    @property
+    def root_dir(self) -> Path:
+        """Backwards compatibility property returning default repository directory."""
+        return self.default_root_dir
+
+    @property
+    def repository_name(self) -> str:
+        """Backwards compatibility property returning default repository name."""
+        return self.default_repo_name
+
+    def register_repository(
+        self,
+        repo_id: str,
+        root_dir: Path,
+        repository_name: str,
+    ) -> SourceGraph:
+        """Registers a new repository on disk and immediately generates its SourceGraph."""
+        if not repo_id or not repo_id.strip():
+            raise ApplicationError(
+                code=ErrorCode.INVALID_REQUEST,
+                message="Repository ID must not be empty.",
+                status_code=400,
+            )
+        resolved_dir = root_dir.resolve()
+        if not resolved_dir.is_dir():
+            raise ApplicationError(
+                code=ErrorCode.NOT_FOUND,
+                message=f"Repository directory does not exist: {root_dir}",
+                status_code=404,
+            )
+
         with self._lock:
-            if self._graph is None or refresh:
-                self._graph = build_source_graph(
-                    self.root_dir,
-                    repository_name=self.repository_name,
-                )
-            return self._graph
+            graph = build_source_graph(
+                resolved_dir,
+                repository_name=repository_name,
+            )
+            self._repos[repo_id] = RepositoryEntry(
+                repo_id=repo_id,
+                root_dir=resolved_dir,
+                repository_name=repository_name,
+                graph=graph,
+            )
+            return graph
 
-    def get_file(self, relative_path: str) -> FileDetailResponse:
+    def get_repo_path(self, repo_id: str | None = None) -> Path:
+        """Returns root directory Path on disk for the specified or default repository."""
+        target_id = repo_id if repo_id is not None and repo_id.strip() else DEFAULT_REPO_ID
+        with self._lock:
+            entry = self._repos.get(target_id)
+            if entry is None:
+                raise ApplicationError(
+                    code=ErrorCode.NOT_FOUND,
+                    message=f"Repository '{target_id}' not found.",
+                    status_code=404,
+                )
+            return entry.root_dir
+
+    def get_graph(
+        self,
+        repo_id: str | None = None,
+        refresh: bool = False,
+    ) -> SourceGraph:
+        """Returns the SourceGraph for the specified or default repository."""
+        target_id = repo_id if repo_id is not None and repo_id.strip() else DEFAULT_REPO_ID
+        with self._lock:
+            entry = self._repos.get(target_id)
+            if entry is None:
+                raise ApplicationError(
+                    code=ErrorCode.NOT_FOUND,
+                    message=f"Repository '{target_id}' not found.",
+                    status_code=404,
+                )
+            if entry.graph is None or refresh:
+                entry.graph = build_source_graph(
+                    entry.root_dir,
+                    repository_name=entry.repository_name,
+                )
+            return entry.graph
+
+    def get_file(
+        self,
+        relative_path: str,
+        repo_id: str | None = None,
+    ) -> FileDetailResponse:
         """Returns file content, line count, and symbols after path safety validation."""
         if not relative_path:
             raise ApplicationError(
@@ -62,6 +154,17 @@ class CodebaseService:
                 message="Path parameter must not be empty.",
                 status_code=400,
             )
+
+        target_id = repo_id if repo_id is not None and repo_id.strip() else DEFAULT_REPO_ID
+        with self._lock:
+            entry = self._repos.get(target_id)
+            if entry is None:
+                raise ApplicationError(
+                    code=ErrorCode.NOT_FOUND,
+                    message=f"Repository '{target_id}' not found.",
+                    status_code=404,
+                )
+            repo_root = entry.root_dir
 
         clean_path = relative_path.replace("\\", "/").strip()
         if clean_path.startswith("/") or clean_path.startswith("./"):
@@ -75,9 +178,9 @@ class CodebaseService:
                 status_code=403,
             )
 
-        target_file = (self.root_dir / posix).resolve()
+        target_file = (repo_root / posix).resolve()
         try:
-            target_file.relative_to(self.root_dir)
+            target_file.relative_to(repo_root)
         except ValueError as exc:
             raise ApplicationError(
                 code=ErrorCode.FORBIDDEN,
@@ -106,7 +209,7 @@ class CodebaseService:
         content_hash = compute_content_hash(content)
 
         # Retrieve symbols for this file from the graph
-        graph = self.get_graph()
+        graph = self.get_graph(repo_id=target_id)
         file_symbols: list[FileSymbolSummary] = []
         for sym in graph.symbols:
             matching_file = next((f for f in graph.files if f.id == sym.file_id), None)
@@ -128,6 +231,19 @@ class CodebaseService:
             content_hash=content_hash,
             symbols=file_symbols,
         )
+
+    def list_repositories(self) -> list[dict[str, Any]]:
+        """Returns metadata for all registered repositories."""
+        with self._lock:
+            return [
+                {
+                    "repo_id": entry.repo_id,
+                    "repository_name": entry.repository_name,
+                    "root_dir": str(entry.root_dir),
+                    "indexed": entry.graph is not None,
+                }
+                for entry in self._repos.values()
+            ]
 
 
 _DEFAULT_SERVICE: CodebaseService | None = None

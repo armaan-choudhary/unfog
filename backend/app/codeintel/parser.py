@@ -71,6 +71,7 @@ class ParsedModule:
     imports: list[RawImport] = field(default_factory=list)
     calls: list[RawCall] = field(default_factory=list)
     inheritances: list[RawInheritance] = field(default_factory=list)
+    assigned_instances: dict[str, str] = field(default_factory=dict)
     tree_sitter_node_count: int = 0
     tree_sitter_valid: bool = True
 
@@ -119,8 +120,22 @@ class _ASTVisitor(ast.NodeVisitor):
         self.imports: list[RawImport] = []
         self.calls: list[RawCall] = []
         self.inheritances: list[RawInheritance] = []
+        self.assigned_instances: dict[str, str] = {}
         self._current_class: str | None = None
         self._current_callable: str | None = None
+
+    def visit_Assign(self, node: ast.Assign) -> None:
+        if isinstance(node.value, ast.Call):
+            target_class: str | None = None
+            if isinstance(node.value.func, ast.Name):
+                target_class = node.value.func.id
+            elif isinstance(node.value.func, ast.Attribute):
+                target_class = node.value.func.attr
+            if target_class:
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        self.assigned_instances[target.id] = target_class
+        self.generic_visit(node)
 
     def visit_Import(self, node: ast.Import) -> None:
         for alias in node.names:
@@ -280,6 +295,7 @@ def parse_python_source(relative_path: str, source_code: str) -> ParsedModule:
         imports=visitor.imports,
         calls=visitor.calls,
         inheritances=visitor.inheritances,
+        assigned_instances=visitor.assigned_instances,
         tree_sitter_node_count=node_count,
         tree_sitter_valid=tree_valid,
     )

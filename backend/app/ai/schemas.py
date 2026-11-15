@@ -39,6 +39,9 @@ class ExplainRequest(BaseModel):
     prompt: str | None = Field(
         default=None, description="Optional specific prompt or question about the symbol"
     )
+    repo_id: str | None = Field(
+        default=None, description="Optional repository identifier for multi-repo support"
+    )
 
 
 class ExplainResponse(BaseModel):
@@ -81,6 +84,9 @@ class ChatRequest(BaseModel):
     )
     history: list[ChatMessage] = Field(
         default_factory=list, description="Prior conversation history"
+    )
+    repo_id: str | None = Field(
+        default=None, description="Optional repository identifier for multi-repo support"
     )
 
 

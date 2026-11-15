@@ -9,11 +9,13 @@ import styles from "./SourceInspectorTab.module.css";
 
 interface SourceInspectorTabProps {
   selectedNode: CodebaseNodeData | null;
+  repoId?: string;
   onAskAi: (prompt: string, symbol: CodebaseNodeData) => void;
 }
 
 export function SourceInspectorTab({
   selectedNode,
+  repoId,
   onAskAi,
 }: SourceInspectorTabProps) {
   const [fileDetail, setFileDetail] = useState<FileDetailResponse | null>(null);
@@ -24,7 +26,7 @@ export function SourceInspectorTab({
     if (!selectedNode?.path) return;
     let isCancelled = false;
 
-    fetchFileDetail(selectedNode.path)
+    fetchFileDetail(selectedNode.path, repoId)
       .then((detail) => {
         if (!isCancelled) {
           setFileDetail(detail);
@@ -37,7 +39,7 @@ export function SourceInspectorTab({
     return () => {
       isCancelled = true;
     };
-  }, [selectedNode?.path]);
+  }, [selectedNode?.path, repoId]);
 
   // Auto-scroll to highlighted symbol or line range
   const startLine = selectedNode?.range?.start_line;
@@ -51,7 +53,7 @@ export function SourceInspectorTab({
     if (lineElement) {
       lineElement.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-  }, [fileDetail, startLine]);
+  }, [startLine, fileDetail]);
 
   const handleCopy = () => {
     if (!fileDetail?.content) return;
@@ -152,7 +154,7 @@ export function SourceInspectorTab({
           </button>
         </div>
 
-        <div ref={codeScrollRef} className={styles.codeScroll}>
+        <div className={styles.codeScroll} ref={codeScrollRef}>
           {isLoading ? (
             <div
               style={{ padding: "2rem", textAlign: "center", color: "#888" }}

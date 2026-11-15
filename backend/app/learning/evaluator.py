@@ -12,14 +12,16 @@ class ChallengeEvaluator:
 
     def evaluate(self, challenge_id: str, request: EvaluateRequest) -> EvaluateResponse:
         """Evaluate submission against challenge definition."""
-        challenge = get_challenge_by_id(challenge_id)
+        challenge = get_challenge_by_id(challenge_id, repo_id=request.repo_id)
         if not challenge:
             raise KeyError(f"Challenge '{challenge_id}' not found.")
 
-        # Grounded citation for the challenge target
+        # Grounded citation for the challenge target in the active repository
+        target_repo = challenge.repo_id or request.repo_id
         ctx = retrieve_symbol_context(
             path=challenge.target_path,
             symbol_name=challenge.target_symbol,
+            repo_id=target_repo,
         )
         citation = ctx.to_citation()
 

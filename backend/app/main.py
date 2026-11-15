@@ -18,6 +18,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.api.ai import router as ai_router
 from app.api.codeintel import router as codeintel_router
+from app.api.github import router as github_router
 from app.api.health import check_database
 from app.api.health import router as health_router
 from app.api.learning import router as learning_router
@@ -199,6 +200,7 @@ def create_app(
     app.include_router(health_router)
     app.include_router(resources_router)
     app.include_router(codeintel_router)
+    app.include_router(github_router)
     app.include_router(ai_router)
     app.include_router(learning_router)
     for router in routers:

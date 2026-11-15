@@ -99,3 +99,84 @@ def test_evaluate_unknown_challenge_raises_key_error() -> None:
 
     with pytest.raises(KeyError, match="not found"):
         evaluator.evaluate("nonexistent-challenge-id", req)
+
+
+def test_dynamic_locate_challenge_generation(tmp_path: pytest.TempPathFactory) -> None:
+    from uuid import uuid4
+
+    from app.codeintel.models import (
+        LineRange as IntelLineRange,
+    )
+    from app.codeintel.models import (
+        SnapshotInfo,
+        SnapshotRevision,
+        SourceFile,
+        SourceGraph,
+        SourceSymbol,
+    )
+    from app.learning.challenges import generate_locate_challenge_for_graph
+
+    snap_id = uuid4()
+    file_id = uuid4()
+    sym_id = uuid4()
+    alt_sym_id = uuid4()
+
+    graph = SourceGraph(
+        schema_version="1.0",
+        snapshot=SnapshotInfo(
+            id=snap_id,
+            repository_id=uuid4(),
+            repository_name="sample_imported_repo",
+            revision=SnapshotRevision(kind="git_commit", value="commit123"),
+            manifest_hash="sha256:" + "a" * 64,
+        ),
+        files=[
+            SourceFile(
+                id=file_id,
+                snapshot_id=snap_id,
+                path="mypackage/core.py",
+                language="python",
+                content_hash="sha256:" + "b" * 64,
+                line_count=50,
+            )
+        ],
+        symbols=[
+            SourceSymbol(
+                id=sym_id,
+                snapshot_id=snap_id,
+                file_id=file_id,
+                name="parse_expression",
+                qualified_name="mypackage.core.parse_expression",
+                kind="function",
+                language="python",
+                range=IntelLineRange(start_line=10, end_line=25),
+                docstring="Parses expression tokens into an abstract syntax tree.",
+            ),
+            SourceSymbol(
+                id=alt_sym_id,
+                snapshot_id=snap_id,
+                file_id=file_id,
+                name="evaluate_expression",
+                qualified_name="mypackage.core.evaluate_expression",
+                kind="function",
+                language="python",
+                range=IntelLineRange(start_line=27, end_line=40),
+            ),
+        ],
+        citations=[],
+        edges=[],
+    )
+
+    challenge = generate_locate_challenge_for_graph(graph, "test-repo-42")
+    assert challenge.id == "challenge-locate-test-repo-42"
+    assert challenge.type == "locate"
+    assert challenge.correct_answer == "parse_expression"
+    assert "parse_expression" in challenge.options
+    assert len(challenge.options) == 4
+    assert challenge.target_path == "mypackage/core.py"
+    assert "Parses expression tokens" in challenge.prompt
+    assert "10" in challenge.hint
+
+    pub = challenge.to_public_challenge()
+    assert pub.id == challenge.id
+    assert not hasattr(pub, "correct_answer")

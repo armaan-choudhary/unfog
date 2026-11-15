@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from app.learning.challenges import list_challenges
 from app.learning.evaluator import get_challenge_evaluator
@@ -17,9 +17,14 @@ router = APIRouter(prefix="/api/v1/learning", tags=["learning"])
     status_code=status.HTTP_200_OK,
     summary="List available learning challenges",
 )
-async def get_challenges() -> list[Challenge]:
-    """Retrieve all active code understanding challenges grounded in the sample service."""
-    return list_challenges()
+async def get_challenges(
+    repo_id: str | None = Query(
+        default=None,
+        description="Optional repository identifier for multi-repo challenge retrieval",
+    ),
+) -> list[Challenge]:
+    """Retrieve all active code understanding challenges grounded in the active repository."""
+    return list_challenges(repo_id=repo_id)
 
 
 @router.post(
@@ -39,5 +44,10 @@ async def evaluate_challenge(
     except KeyError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc

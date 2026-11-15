@@ -22,7 +22,7 @@ SYSTEM_TUTOR_PROMPT = (
     "You are Unfog AI Companion, an expert software architecture tutor. "
     "Ground all explanations strictly in the provided code snippets and real repository "
     "structure. Be precise, educational, and concise. Never fabricate nonexistent symbols, "
-    "relationships, or line numbers."
+    "relationships, or line numbers. Never leak context across different repositories."
 )
 
 
@@ -31,11 +31,17 @@ class AIService:
 
     def explain(self, request: ExplainRequest) -> ExplainResponse:
         """Explain a symbol or file, falling back gracefully if Gemini is offline."""
-        ctx = retrieve_symbol_context(request.path, request.symbol_name)
+        ctx = retrieve_symbol_context(
+            path=request.path,
+            symbol_name=request.symbol_name,
+            repo_id=request.repo_id,
+        )
         target_name = request.symbol_name or ctx.path
+        repo_label = request.repo_id or "sample_service"
         default_user_prompt = f"Explain the function and architectural role of {target_name}."
 
         prompt_text = (
+            f"Repository: {repo_label}\n"
             f"File: {ctx.path}\n"
             f"Line Range: {ctx.range.start_line}-{ctx.range.end_line}\n"
             f"Snippet:\n```python\n{ctx.snippet}\n```\n\n"
@@ -49,21 +55,22 @@ class AIService:
 
         if generated_text:
             explanation = generated_text
-            model_used = model
+            final_model = model
         else:
             explanation = get_deterministic_explanation(
                 path=request.path,
                 symbol_name=request.symbol_name,
                 prompt=request.prompt,
                 context=ctx,
+                repo_id=request.repo_id,
             )
-            model_used = "offline-fallback"
+            final_model = "offline-fallback"
 
         return ExplainResponse(
             explanation=explanation,
             citations=[ctx.to_citation()],
             provenance="ai_inferred",
-            model=model_used,
+            model=final_model,
         )
 
     def chat(self, request: ChatRequest) -> ChatResponse:
@@ -71,6 +78,7 @@ class AIService:
         contexts = retrieve_relevant_citations_for_query(
             query=request.message,
             active_path=request.active_path,
+            repo_id=request.repo_id,
         )
 
         blocks: list[str] = []
@@ -79,7 +87,9 @@ class AIService:
             blocks.append(f"{header}\n```python\n{c.snippet}\n```")
         context_blocks = "\n\n".join(blocks)
 
+        repo_label = request.repo_id or "sample_service"
         user_prompt = (
+            f"Active Repository: {repo_label}\n"
             f"Relevant Code Context:\n{context_blocks}\n\n"
             f"User Question: {request.message}\n"
             "Answer the question directly, citing the relevant source files and functions."
@@ -93,19 +103,20 @@ class AIService:
 
         if generated_text:
             reply = generated_text
-            model_used = model
+            final_model = model
         else:
             reply = get_deterministic_chat_reply(
                 message=request.message,
                 active_path=request.active_path,
                 citations=contexts,
+                repo_id=request.repo_id,
             )
-            model_used = "offline-fallback"
+            final_model = "offline-fallback"
 
         return ChatResponse(
             reply=reply,
             citations=[c.to_citation() for c in contexts],
-            model=model_used,
+            model=final_model,
         )
 
 
