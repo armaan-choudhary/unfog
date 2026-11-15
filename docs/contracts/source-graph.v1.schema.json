@@ -42,12 +42,13 @@
       "properties": {
         "id": { "$ref": "#/$defs/snapshotId" },
         "repository_id": { "$ref": "#/$defs/repositoryId" },
+        "repository_name": { "type": ["string", "null"], "maxLength": 256 },
         "revision": {
           "type": "object",
           "additionalProperties": false,
           "required": ["kind", "value"],
           "properties": {
-            "kind": { "enum": ["git_commit", "content_manifest"] },
+            "kind": { "enum": ["git_commit", "content_manifest", "local_tree"] },
             "value": { "type": "string", "minLength": 1, "maxLength": 256 }
           }
         },
@@ -84,6 +85,7 @@
         "qualified_name": { "type": ["string", "null"], "maxLength": 1024 },
         "kind": { "enum": ["function", "class", "method", "interface", "module", "variable", "property", "unknown"] },
         "language": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "docstring": { "type": ["string", "null"], "maxLength": 4096 },
         "range": { "$ref": "#/$defs/lineRange" }
       }
     },
