@@ -54,7 +54,9 @@ Protected repository reads require an OIDC JWT access token in the
 `Authorization: Bearer` header with the `repositories:read` scope. Configure
 `OIDC_ISSUER`, `OIDC_AUDIENCE`, and `OIDC_JWKS_URL`; the API verifies the
 signature against that JWKS, the configured asymmetric algorithm allowlist,
-issuer, audience, expiry, subject, and a verified email claim. JWKS requests
+issuer, audience, expiry, subject, and `repositories:read` scope. Email and
+`email_verified` claims are optional profile data; only a present, verified
+email is stored. JWKS requests
 have a bounded timeout. Production startup fails if OIDC configuration is
 missing, incomplete, or uses non-HTTPS issuer/JWKS URLs.
 
@@ -63,8 +65,10 @@ profile data only and is never used to find or link an account. Existing users
 and repository ownership are preserved by the migration, but existing users
 without an OIDC identity are not automatically linked; explicit account
 recovery/linking is not implemented. Because the current email column remains
-unique and required, an OIDC identity with a duplicate email is rejected
-without revealing the existing account.
+unique but nullable, a duplicate verified email is discarded for the new user;
+the identity still resolves only by issuer and subject. Downgrade to the
+pre-P1-04 schema is refused while email-less users exist, avoiding fabricated
+addresses or data loss.
 
 For local work only, set `UNFOG_DEV_AUTH_ENABLED=true`, provide a generated
 `UNFOG_DEV_AUTH_TOKEN` of at least 32 characters, and configure

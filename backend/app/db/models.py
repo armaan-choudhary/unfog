@@ -47,7 +47,7 @@ class User(UUIDPrimaryKey, CreatedAt, Base):
         ),
     )
 
-    email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True)
+    email: Mapped[str | None] = mapped_column(String(320), nullable=True, unique=True)
     auth_issuer: Mapped[str | None] = mapped_column(String(512), nullable=True)
     auth_subject: Mapped[str | None] = mapped_column(String(255), nullable=True)
 

@@ -3,7 +3,8 @@
 ## Authentication and ownership
 
 API access tokens are verified against the configured OIDC issuer, audience,
-JWKS, expiry, and asymmetric signing algorithm allowlist. Production requires
+JWKS, expiry, required scope, and asymmetric signing algorithm allowlist. Email
+claims are optional profile data and do not affect authentication. Production requires
 HTTPS issuer/JWKS configuration. Users are keyed only by the immutable
 `(issuer, subject)` identity pair; email is profile data and is never used to
 link accounts. Local bearer authentication is available only with the explicit
@@ -15,6 +16,7 @@ resource and a resource owned by another user return the same not-found
 response. Do not include source locators or raw job failure details in these
 responses or request logs. Existing users are preserved during identity
 migration and are not automatically linked to an OIDC identity.
+Verified email collisions are discarded rather than used to link identities.
 
 These controls cover the current read endpoints. Every future repository,
 snapshot, and job endpoint must apply the same owner-scoped lookup before

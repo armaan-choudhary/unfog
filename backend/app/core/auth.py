@@ -20,7 +20,7 @@ from app.db.models import User
 from app.db.session import get_db_session
 
 LOCAL_DEV_ISSUER = "urn:unfog:local-development"
-REQUIRED_IDENTITY_CLAIMS = ["exp", "iss", "aud", "sub", "email", "email_verified", "scope"]
+REQUIRED_IDENTITY_CLAIMS = ["exp", "iss", "aud", "sub", "scope"]
 
 
 class InvalidBearerToken(Exception):
@@ -44,7 +44,7 @@ class JwksProvider(Protocol):
 class VerifiedIdentity:
     issuer: str
     subject: str
-    email: str
+    email: str | None
     scopes: frozenset[str]
 
 
@@ -89,19 +89,24 @@ class OIDCBearerVerifier:
             raise InvalidBearerToken from exc
 
         subject = claims.get("sub")
-        email = claims.get("email")
+        email_claim = claims.get("email")
         scopes = claims.get("scope")
         if (
             not isinstance(subject, str)
             or not subject
             or len(subject) > 255
-            or not isinstance(email, str)
-            or not email
-            or len(email) > 320
-            or claims.get("email_verified") is not True
             or not isinstance(scopes, str)
         ):
             raise InvalidBearerToken
+
+        email = (
+            email_claim
+            if claims.get("email_verified") is True
+            and isinstance(email_claim, str)
+            and email_claim
+            and len(email_claim) <= 320
+            else None
+        )
 
         return VerifiedIdentity(
             issuer=self.issuer,
@@ -173,23 +178,29 @@ def resolve_current_user(session: Session, identity: VerifiedIdentity) -> User:
     if user is not None:
         return user
 
-    user = User(
-        email=identity.email,
-        auth_issuer=identity.issuer,
-        auth_subject=identity.subject,
-    )
-    session.add(user)
-    try:
-        session.commit()
-    except IntegrityError as exc:
-        session.rollback()
-        # Resolve a concurrent insert by immutable identity only. Never link by email.
-        user = session.scalar(statement)
-        if user is not None:
-            return user
-        raise _unauthenticated() from exc
-    session.refresh(user)
-    return user
+    email_candidates = [identity.email, None] if identity.email is not None else [None]
+    for email in email_candidates:
+        user = User(
+            email=email,
+            auth_issuer=identity.issuer,
+            auth_subject=identity.subject,
+        )
+        session.add(user)
+        try:
+            session.commit()
+        except IntegrityError as exc:
+            session.rollback()
+            # Resolve a concurrent insert by immutable identity only. Never link by email.
+            user = session.scalar(statement)
+            if user is not None:
+                return user
+            if email is None:
+                raise _unauthenticated() from exc
+            # An email is profile data; a collision must not block a new identity.
+            continue
+        session.refresh(user)
+        return user
+    raise _unauthenticated()
 
 
 async def get_verified_identity(

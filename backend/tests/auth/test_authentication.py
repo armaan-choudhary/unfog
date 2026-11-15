@@ -85,25 +85,27 @@ class UnavailableJwksProvider:
 def _token(
     *,
     subject: str = "subject-a",
-    email: str = "user-a@example.test",
+    email: str | None = "user-a@example.test",
     issuer: str = ISSUER,
     audience: str | list[str] = AUDIENCE,
     scope: str = "repositories:read",
     expires_at: int = 4_102_444_800,
-    email_verified: bool = True,
+    email_verified: bool | None = True,
     signer: Ed25519PrivateKey = TEST_SIGNER,
     algorithm: str = "EdDSA",
 ) -> str:
-    claims = {
+    claims: dict[str, Any] = {
         "iss": issuer,
         "aud": audience,
         "sub": subject,
-        "email": email,
-        "email_verified": email_verified,
         "scope": scope,
         "iat": 1_700_000_000,
         "exp": expires_at,
     }
+    if email is not None:
+        claims["email"] = email
+    if email_verified is not None:
+        claims["email_verified"] = email_verified
     return jwt.encode(claims, signer, algorithm=algorithm, headers={"kid": "test-key"})
 
 
@@ -230,13 +232,26 @@ def test_verifier_accepts_deterministic_signature_and_claims() -> None:
 
 
 @pytest.mark.parametrize(
+    ("email", "email_verified"),
+    [(None, None), ("user-a@example.test", False), ("user-a@example.test", None)],
+)
+def test_verifier_accepts_missing_or_unverified_optional_email_claims(
+    email: str | None, email_verified: bool | None
+) -> None:
+    identity = _verifier().verify(_token(email=email, email_verified=email_verified))
+
+    assert identity.issuer == ISSUER
+    assert identity.subject == "subject-a"
+    assert identity.email is None
+
+
+@pytest.mark.parametrize(
     "token",
     [
         _token(signer=OTHER_SIGNER),
         _token(audience="another-api"),
         _token(issuer="https://attacker.example.test/"),
         _token(expires_at=1_700_000_000),
-        _token(email_verified=False),
         "not.a.jwt",
     ],
 )
@@ -251,8 +266,6 @@ def test_verifier_rejects_algorithm_outside_configured_allowlist() -> None:
             "iss": ISSUER,
             "aud": AUDIENCE,
             "sub": "subject-a",
-            "email": "user-a@example.test",
-            "email_verified": True,
             "scope": "repositories:read",
             "iat": 1_700_000_000,
             "exp": 4_102_444_800,
@@ -419,7 +432,22 @@ def test_identity_is_resolved_only_by_issuer_and_subject(harness: AuthHarness) -
         assert users[0].email == "stable@example.test"
 
 
-def test_email_collision_does_not_link_oidc_identity(harness: AuthHarness) -> None:
+def test_identity_without_email_claim_is_persisted_and_authorized(harness: AuthHarness) -> None:
+    response = harness.request(
+        "GET",
+        f"/repositories/{uuid4()}",
+        headers={"Authorization": f"Bearer {_token(email=None, email_verified=None)}"},
+    )
+
+    _assert_error(response, 404, "not_found")
+    with harness.factory() as session:
+        user = session.scalar(select(User).where(User.auth_subject == "subject-a"))
+        assert user is not None
+        assert user.auth_issuer == ISSUER
+        assert user.email is None
+
+
+def test_email_collision_does_not_link_or_block_oidc_identity(harness: AuthHarness) -> None:
     legacy = User(email="same@example.test")
     with harness.factory() as session:
         session.add(legacy)
@@ -432,12 +460,14 @@ def test_email_collision_does_not_link_oidc_identity(harness: AuthHarness) -> No
         headers={"Authorization": f"Bearer {_token(email='same@example.test')}"},
     )
 
-    _assert_error(response, 401, "unauthenticated")
+    _assert_error(response, 404, "not_found")
     with harness.factory() as session:
         users = list(session.scalars(select(User)).all())
-        assert len(users) == 1
-        assert users[0].id == legacy_id
-        assert users[0].auth_issuer is None
+        assert len(users) == 2
+        legacy = next(user for user in users if user.id == legacy_id)
+        provisioned = next(user for user in users if user.auth_subject == "subject-a")
+        assert legacy.auth_issuer is None
+        assert provisioned.email is None
 
 
 def test_local_auth_requires_secret_and_ignores_impersonation_headers() -> None:

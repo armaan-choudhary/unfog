@@ -1,4 +1,4 @@
-"""Add immutable OIDC issuer/subject identity to users.
+"""Add immutable OIDC identity and optional profile email to users.
 
 Revision ID: 0002_user_oidc_identity
 Revises: 0001_initial_persistence
@@ -19,6 +19,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     with op.batch_alter_table("users") as batch_op:
+        batch_op.alter_column("email", existing_type=sa.String(length=320), nullable=True)
         batch_op.add_column(sa.Column("auth_issuer", sa.String(length=512), nullable=True))
         batch_op.add_column(sa.Column("auth_subject", sa.String(length=255), nullable=True))
         batch_op.create_unique_constraint("uq_users_auth_identity", ["auth_issuer", "auth_subject"])
@@ -67,6 +68,15 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    bind = op.get_bind()
+    has_email_less_users = bind.execute(
+        sa.text("SELECT 1 FROM users WHERE email IS NULL LIMIT 1")
+    ).first()
+    if has_email_less_users is not None:
+        raise RuntimeError(
+            "Cannot downgrade OIDC identity while users without email addresses exist."
+        )
+
     dialect = context.get_context().dialect.name
     if dialect == "postgresql":
         op.execute("DROP TRIGGER IF EXISTS unfog_users_auth_identity_immutable ON users")
@@ -79,3 +89,4 @@ def downgrade() -> None:
         batch_op.drop_constraint("uq_users_auth_identity", type_="unique")
         batch_op.drop_column("auth_subject")
         batch_op.drop_column("auth_issuer")
+        batch_op.alter_column("email", existing_type=sa.String(length=320), nullable=False)

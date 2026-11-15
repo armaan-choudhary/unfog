@@ -169,6 +169,26 @@ class LivePostgresPersistenceTests(unittest.TestCase):
                         },
                     )
 
+            email_less_user_id = uuid4()
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "INSERT INTO users (id, auth_issuer, auth_subject) "
+                        "VALUES (:id, :issuer, :subject)"
+                    ),
+                    {
+                        "id": email_less_user_id,
+                        "issuer": "https://issuer.example.test",
+                        "subject": "email-less-subject",
+                    },
+                )
+            with self.assertRaisesRegex(RuntimeError, "users without email addresses"):
+                command.downgrade(config, "0001_initial_persistence")
+            with engine.begin() as connection:
+                connection.execute(
+                    text("DELETE FROM users WHERE id = :id"), {"id": email_less_user_id}
+                )
+
             command.downgrade(config, "0001_initial_persistence")
             downgraded = inspect(engine)
             self.assertNotIn(

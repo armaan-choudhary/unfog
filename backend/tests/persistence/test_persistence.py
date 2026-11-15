@@ -186,6 +186,23 @@ class PersistenceTests(unittest.TestCase):
                             {"id": UUID("96e9af70-615e-4e55-9b1b-3d8c83179579").hex},
                         )
 
+                email_less_user_id = UUID("bc99f360-cd47-4f32-91a5-20dcd23693c6")
+                with migration_engine.begin() as connection:
+                    connection.execute(
+                        text(
+                            "INSERT INTO users (id, auth_issuer, auth_subject) "
+                            "VALUES (:id, 'https://issuer.example.test', 'email-less')"
+                        ),
+                        {"id": email_less_user_id.hex},
+                    )
+
+                with self.assertRaisesRegex(RuntimeError, "users without email addresses"):
+                    command.downgrade(config, "0001_initial_persistence")
+                with migration_engine.begin() as connection:
+                    connection.execute(
+                        text("DELETE FROM users WHERE id = :id"),
+                        {"id": email_less_user_id.hex},
+                    )
                 command.downgrade(config, "0001_initial_persistence")
                 with migration_engine.connect() as connection:
                     self.assertEqual(
