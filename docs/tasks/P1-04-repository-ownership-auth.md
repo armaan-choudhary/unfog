@@ -1,9 +1,10 @@
 # P1-04 — Repository ownership and authentication
 
-**Status:** implementation complete; review pending
+**Status:** complete; merged to `master` on 2026-11-15
 **Branch:** `task/P1-04-repository-ownership-auth`
 **Base:** `01095ff0df7607cc4ad1bb147acd5a8892d4cff0`
 **Dependencies:** P1-02 persistence; approved provider-neutral OIDC JWT decision
+**Merge commit:** `43d4f41ffb6589ac1d2826ba21c026efd7599e7e`
 
 ## Delivered
 
@@ -59,14 +60,16 @@ exists, so it never fabricates an address or discards a provisioned identity.
   Next.js production build passed; the frontend was not changed.
 - `npm ci` reported seven moderate dependency advisories; no dependency
   upgrades were applied.
-- Implementation commit: `e6191ac2bedd4656aa634456d8003034dd8a1ad6`.
-- Pull request: https://github.com/armaan-choudhary/unfog/pull/4 (open; targets
-  `master`).
-- GitHub Actions run
-  [43720061290](https://github.com/armaan-choudhary/unfog/actions/runs/43720061290):
+- Implementation commits: `e6191ac2bedd4656aa634456d8003034dd8a1ad6`,
+  `3e1840eb6a5595033785a2ca4f6b885b8e6ef9f0`, and
+  `3ca7f97e8cc845698bdc678e01c25610f96714ab`.
+- Pull request: https://github.com/armaan-choudhary/unfog/pull/4 (merged).
+- Final PR run
+  [43720360892](https://github.com/armaan-choudhary/unfog/actions/runs/43720360892)
+  and master push
+  [43720465846](https://github.com/armaan-choudhary/unfog/actions/runs/43720465846):
   frontend, backend Python 3.11, backend Python 3.14, and PostgreSQL 17 checks
-  passed after the optional-email compatibility change. The explicit local
-  environment guard is awaiting its new PR check run.
+  all passed.
 
 ## Limitations and follow-up boundaries
 
