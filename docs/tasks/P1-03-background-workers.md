@@ -97,7 +97,8 @@ required. There is intentionally no public job submission API yet.
 - mypy application checks: passed.
 - Live containers were stopped after verification.
 - Python 3.11 was not available in the local interpreter; CI retains the
-  project's Python 3.11/3.14 matrix. GitHub Actions has not run for this branch.
+  project's Python 3.11/3.14 matrix. GitHub Actions passed on both supported
+  versions and in the PostgreSQL 17 integration job.
 - The sandbox initially blocked access to the published Docker ports; the live
   run completed after running the approved disposable-service test command with
   host access.
@@ -117,8 +118,13 @@ required. There is intentionally no public job submission API yet.
 - A hard worker kill after `running` commits leaves a stale row for explicit
   diagnosis/requeue. No periodic scheduler, Celery Beat, result backend,
   repository processing, LLM integration, or schema migration was introduced.
-- Local Git inspection found an active repository on `master` at start, with no
-  configured remote. Work is on `task/P1-03-celery-redis-workers`; nothing was
-  pushed and no remote settings were changed. The pre-existing worktree had
-  unrelated deletions and untracked project files; they were left out of the
-  P1-03 commit.
+- PR [#1](https://github.com/armaan-choudhary/unfog/pull/1) merged the P1-03
+  branch into `master` on 2026-11-15 using a merge commit
+  (`a0ab751efbf4d47d420a3e3a80cd2f7332948bda`). The feature commit
+  `4b4d8687b3890c44048ea98fff701db156d9d7fc` and task branch were preserved.
+- The subsequent legacy Rust/Vite cleanup merged through PR
+  [#2](https://github.com/armaan-choudhary/unfog/pull/2); its audit and scope are
+  recorded in `repository-legacy-cleanup.md`.
+- Post-merge GitHub Actions passed on `master` at
+  `cae372ccc1d6873551b94d5b966874813130f2bc`, including frontend checks, Python
+  3.11 and 3.14 quality/tests, and PostgreSQL 17 migration/constraint tests.
