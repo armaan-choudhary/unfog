@@ -3,6 +3,8 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
 import {
   ReactFlow,
+  ReactFlowProvider,
+  useReactFlow,
   Background,
   Controls,
   MiniMap,
@@ -31,12 +33,13 @@ interface CodebaseMapProps {
   onSelectNode: (nodeData: CodebaseNodeData) => void;
 }
 
-export function CodebaseMap({
+function CodebaseMapInner({
   graph,
   selectedNodeId,
   highlightedPath,
   onSelectNode,
 }: CodebaseMapProps) {
+  const { setCenter } = useReactFlow();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterKind, setFilterKind] = useState<string>("all");
 
@@ -54,8 +57,8 @@ export function CodebaseMap({
     });
 
     // Column layout: layout each file at an x offset
-    const columnSpacing = 320;
-    const rowSpacing = 160;
+    const columnSpacing = 360;
+    const rowSpacing = 180;
 
     graph.files.forEach((file, fileIdx) => {
       const colX = 60 + fileIdx * columnSpacing;
@@ -174,6 +177,20 @@ export function CodebaseMap({
     setNodes(initialNodes);
   }, [initialNodes, setNodes]);
 
+  // Center and focus on selected node
+  useEffect(() => {
+    if (!selectedNodeId) return;
+    const targetNode = nodes.find(
+      (n) => (n.data as unknown as CodebaseNodeData)?.id === selectedNodeId,
+    );
+    if (targetNode && targetNode.position) {
+      setCenter(targetNode.position.x + 130, targetNode.position.y + 60, {
+        zoom: 1.05,
+        duration: 500,
+      });
+    }
+  }, [selectedNodeId, nodes, setCenter]);
+
   // Node selection handler
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
@@ -275,6 +292,7 @@ export function CodebaseMap({
         onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}
         fitView
+        fitViewOptions={{ padding: 0.25, includeHiddenNodes: false }}
         minZoom={0.2}
         maxZoom={2.0}
         proOptions={{ hideAttribution: true }}
@@ -316,7 +334,7 @@ export function CodebaseMap({
         />
       </ReactFlow>
 
-      {/* Bottom Semantic Legend */}
+      {/* Top Semantic Legend */}
       <div className={styles.legendPanel}>
         <div className={styles.legendItem}>
           <span className={`${styles.legendDot} ${styles.func}`} />
@@ -336,5 +354,13 @@ export function CodebaseMap({
         </div>
       </div>
     </div>
+  );
+}
+
+export function CodebaseMap(props: CodebaseMapProps) {
+  return (
+    <ReactFlowProvider>
+      <CodebaseMapInner {...props} />
+    </ReactFlowProvider>
   );
 }

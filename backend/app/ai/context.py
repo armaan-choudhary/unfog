@@ -18,136 +18,171 @@ SAFE_PATH_PATTERN = re.compile(r"^(?!/)(?!.*(?:^|/)\.\.?(?:/|$))[^\\]+$")
 CANONICAL_SNIPPETS: dict[str, dict[str, tuple[int, int, str]]] = {
     "service/auth.py": {
         "verify_token": (
-            12,
-            25,
+            41,
+            71,
             (
                 "def verify_token(token: str) -> dict[str, Any]:\n"
-                '    """Validates bearer tokens and returns decoded claims."""\n'
-                "    if not token or not token.startswith('Bearer '):\n"
-                "        raise AuthenticationError('Missing or malformed token')\n"
-                "    raw_jwt = token.removeprefix('Bearer ').strip()\n"
-                "    payload = decode_jwt(raw_jwt, secret=JWT_SECRET, algorithms=['HS256'])\n"
-                "    if payload.get('exp', 0) < time.time():\n"
-                "        raise AuthenticationError('Token has expired')\n"
-                "    return payload"
+                '    """Validates bearer tokens."""\n'
+                "    if not token or not isinstance(token, str):\n"
+                '        raise AuthenticationError("Token is missing or malformed.")\n\n'
+                '    parts = token.strip().split(".")\n'
+                "    if len(parts) != 3:\n"
+                '        raise AuthenticationError("Bearer token format invalid.")\n\n'
+                "    user_id, expires_str, signature = parts\n"
+                "    try:\n"
+                "        expires_at = int(expires_str)\n"
+                "    except ValueError as exc:\n"
+                '        raise AuthenticationError("Token timestamp is invalid.") from exc\n\n'
+                "    current_time = int(time.time())\n"
+                "    if current_time > expires_at:\n"
+                '        raise AuthenticationError("Bearer token has expired.")\n\n'
+                '    expected_data = f"{user_id}:{expires_at}".encode("utf-8")\n'
+                "    expected_sig = hmac.new(\n"
+                '        TOKEN_SECRET.encode("utf-8"), expected_data, hashlib.sha256\n'
+                "    ).hexdigest()\n\n"
+                "    if not hmac.compare_digest(signature, expected_sig):\n"
+                '        raise AuthenticationError("Token cryptographic signature mismatch.")\n\n'
+                "    return {\n"
+                '        "sub": user_id,\n'
+                '        "user_id": user_id,\n'
+                '        "expires_at": expires_at,\n'
+                '        "permissions": ["orders:create", "orders:read"],\n'
+                "    }"
             ),
         ),
         "_default": (
-            1,
-            25,
+            41,
+            71,
             (
-                '"""Authentication and bearer token verification service."""\n\n'
-                "import time\n"
-                "from typing import Any\n"
-                "from service.errors import AuthenticationError\n\n"
-                "JWT_SECRET = 'sample-dev-secret-key-32chars!!'\n\n"
                 "def verify_token(token: str) -> dict[str, Any]:\n"
-                '    """Validates bearer tokens and returns decoded claims."""\n'
-                "    if not token or not token.startswith('Bearer '):\n"
-                "        raise AuthenticationError('Missing or malformed token')\n"
-                "    raw_jwt = token.removeprefix('Bearer ').strip()\n"
-                "    payload = decode_jwt(raw_jwt, secret=JWT_SECRET, algorithms=['HS256'])\n"
-                "    if payload.get('exp', 0) < time.time():\n"
-                "        raise AuthenticationError('Token has expired')\n"
-                "    return payload"
+                '    """Validates bearer tokens."""\n'
+                "    if not token or not isinstance(token, str):\n"
+                '        raise AuthenticationError("Token is missing or malformed.")\n\n'
+                '    parts = token.strip().split(".")\n'
+                "    if len(parts) != 3:\n"
+                '        raise AuthenticationError("Bearer token format invalid.")\n\n'
+                "    user_id, expires_str, signature = parts\n"
+                "    try:\n"
+                "        expires_at = int(expires_str)\n"
+                "    except ValueError as exc:\n"
+                '        raise AuthenticationError("Token timestamp is invalid.") from exc\n\n'
+                "    current_time = int(time.time())\n"
+                "    if current_time > expires_at:\n"
+                '        raise AuthenticationError("Bearer token has expired.")\n\n'
+                '    expected_data = f"{user_id}:{expires_at}".encode("utf-8")\n'
+                "    expected_sig = hmac.new(\n"
+                '        TOKEN_SECRET.encode("utf-8"), expected_data, hashlib.sha256\n'
+                "    ).hexdigest()\n\n"
+                "    if not hmac.compare_digest(signature, expected_sig):\n"
+                '        raise AuthenticationError("Token cryptographic signature mismatch.")\n\n'
+                "    return {\n"
+                '        "sub": user_id,\n'
+                '        "user_id": user_id,\n'
+                '        "expires_at": expires_at,\n'
+                '        "permissions": ["orders:create", "orders:read"],\n'
+                "    }"
             ),
         ),
     },
     "service/orders.py": {
-        "process_order": (
-            14,
-            32,
+        "create_order": (
+            51,
+            121,
             (
-                "def process_order(order_data: dict[str, Any], token: str) -> OrderResult:\n"
-                '    """Processes an incoming order after verifying auth."""\n'
-                "    user = verify_token(token)\n"
-                "    validate_order_schema(order_data)\n"
-                "    fee = calculate_fee(order_data['amount'], "
-                "order_data.get('shipping_type', 'standard'))\n"
-                "    total = order_data['amount'] + fee\n"
-                "    return OrderResult(order_id=uuid4(), user_id=user['sub'], "
-                "total=total, status='confirmed')"
+                "    def create_order(\n"
+                "        self,\n"
+                "        token: str,\n"
+                "        items: list[dict[str, Any]],\n"
+                '        shipping_tier: str = "standard",\n'
+                "        discount_code: str | None = None,\n"
+                "    ) -> dict[str, Any]:\n"
+                '        """Creates and validates a new customer order."""\n'
+                "        # Step 1: Perform token signature check\n"
+                "        user_payload = verify_token(token)\n"
+                '        user_id = user_payload["sub"]'
+            ),
+        ),
+        "process_order": (
+            51,
+            121,
+            (
+                "    def create_order(\n"
+                "        self,\n"
+                "        token: str,\n"
+                "        items: list[dict[str, Any]],\n"
+                '        shipping_tier: str = "standard",\n'
+                "        discount_code: str | None = None,\n"
+                "    ) -> dict[str, Any]:\n"
+                '        """Creates and validates a new customer order."""\n'
+                "        # Step 1: Perform token signature check\n"
+                "        user_payload = verify_token(token)\n"
+                '        user_id = user_payload["sub"]'
             ),
         ),
         "_default": (
-            1,
-            32,
+            25,
+            139,
             (
-                '"""Order processing and fulfillment service."""\n\n'
-                "from uuid import uuid4\n"
-                "from typing import Any\n"
-                "from service.auth import verify_token\n"
-                "from service.pricing import calculate_fee\n"
-                "from service.errors import ValidationError\n\n"
-                "def process_order(order_data: dict[str, Any], token: str) -> OrderResult:\n"
-                '    """Processes an incoming order after verifying auth."""\n'
-                "    user = verify_token(token)\n"
-                "    validate_order_schema(order_data)\n"
-                "    fee = calculate_fee(order_data['amount'], "
-                "order_data.get('shipping_type', 'standard'))\n"
-                "    total = order_data['amount'] + fee\n"
-                "    return OrderResult(order_id=uuid4(), user_id=user['sub'], "
-                "total=total, status='confirmed')"
+                "class OrderManager:\n"
+                '    """Manages order lifecycle, authorization, and inventory checks."""\n'
+                "    def __init__(self) -> None:\n"
+                "        self._orders: dict[str, Order] = {}"
             ),
         ),
     },
     "service/pricing.py": {
         "calculate_fee": (
-            8,
-            22,
+            25,
+            32,
             (
-                "def calculate_fee(amount: float, shipping: str = 'standard') -> float:\n"
-                '    """Calculates processing and fulfillment fee for an order."""\n'
-                "    if amount < 0:\n"
-                "        raise ValueError('Order amount cannot be negative')\n"
-                "    base_rate = 0.05 if shipping == 'standard' else 0.10\n"
-                "    return round(amount * base_rate, 2)"
+                'def calculate_fee(amount: float, shipping_tier: str = "standard") -> float:\n'
+                '    """Calculates order processing and shipping fee based on tier and amount."""\n'
+                "    tier = shipping_tier.strip().lower()\n"
+                '    if tier == "express":\n'
+                "        return 15.0\n"
+                '    if tier == "priority":\n'
+                "        return 10.0\n"
+                "    return 5.0"
             ),
         ),
         "_default": (
-            1,
-            22,
+            25,
+            32,
             (
-                '"""Pricing and dynamic fee calculation service."""\n\n'
-                "def calculate_fee(amount: float, shipping: str = 'standard') -> float:\n"
-                '    """Calculates processing and fulfillment fee for an order."""\n'
-                "    if amount < 0:\n"
-                "        raise ValueError('Order amount cannot be negative')\n"
-                "    base_rate = 0.05 if shipping == 'standard' else 0.10\n"
-                "    return round(amount * base_rate, 2)"
+                'def calculate_fee(amount: float, shipping_tier: str = "standard") -> float:\n'
+                '    """Calculates order processing and shipping fee based on tier and amount."""\n'
+                "    tier = shipping_tier.strip().lower()\n"
+                '    if tier == "express":\n'
+                "        return 15.0\n"
+                '    if tier == "priority":\n'
+                "        return 10.0\n"
+                "    return 5.0"
             ),
         ),
     },
     "service/errors.py": {
         "ServiceError": (
-            5,
-            18,
+            6,
+            12,
             (
                 "class ServiceError(Exception):\n"
-                '    """Base class for all domain service exceptions."""\n'
-                "    def __init__(self, message: str, code: str = 'INTERNAL_ERROR') -> None:\n"
+                '    """Base exception for all service domain errors."""\n\n'
+                '    def __init__(self, message: str, code: str = "service_error") -> None:\n'
                 "        super().__init__(message)\n"
                 "        self.message = message\n"
-                "        self.code = code\n\n"
-                "class AuthenticationError(ServiceError):\n"
-                "    def __init__(self, message: str = 'Authentication failed') -> None:\n"
-                "        super().__init__(message, code='UNAUTHENTICATED')"
+                "        self.code = code"
             ),
         ),
         "_default": (
-            1,
-            24,
+            6,
+            12,
             (
-                '"""Service exception definitions."""\n\n'
                 "class ServiceError(Exception):\n"
-                '    """Base class for all domain service exceptions."""\n'
-                "    def __init__(self, message: str, code: str = 'INTERNAL_ERROR') -> None:\n"
+                '    """Base exception for all service domain errors."""\n\n'
+                '    def __init__(self, message: str, code: str = "service_error") -> None:\n'
                 "        super().__init__(message)\n"
                 "        self.message = message\n"
-                "        self.code = code\n\n"
-                "class AuthenticationError(ServiceError):\n"
-                "    def __init__(self, message: str = 'Authentication failed') -> None:\n"
-                "        super().__init__(message, code='UNAUTHENTICATED')"
+                "        self.code = code"
             ),
         ),
     },

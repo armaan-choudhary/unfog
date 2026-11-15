@@ -14,65 +14,105 @@ export const MOCK_FILE_CONTENTS: Record<string, FileDetailResponse> = {
   "service/auth.py": {
     path: "service/auth.py",
     language: "python",
-    line_count: 36,
+    line_count: 71,
     content_hash:
       "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    content: `"""Authentication and token verification service."""
+    content: `"""Authentication and session management module."""
+
+from __future__ import annotations
+
 import hashlib
 import hmac
 import time
-from typing import Optional, Dict, Any
+from typing import Any
 
-SECRET_KEY = "unfog-sample-service-secret-key"
-ALGORITHM = "HS256"
+from service.errors import AuthenticationError
+
+TOKEN_SECRET = "sample-insecure-secret-key-for-demonstration"
 
 
-def verify_token(token: str) -> Dict[str, Any]:
-    """Validates incoming bearer tokens and returns payload."""
-    if not token or not token.startswith("Bearer "):
-        raise ValueError("Invalid authorization header format")
-    raw_token = token.split(" ", 1)[1]
-    parts = raw_token.split(".")
+def hash_password(password: str) -> str:
+    """Hashes a plaintext password using SHA-256 with salt."""
+    salt = "unfog-salt"
+    salted = f"{salt}:{password}".encode("utf-8")
+    return hashlib.sha256(salted).hexdigest()
+
+
+def create_session(user_id: str) -> dict[str, Any]:
+    """Generates a session payload with bearer token and expiration."""
+    expires_at = int(time.time()) + 3600
+    signature_data = f"{user_id}:{expires_at}".encode("utf-8")
+    signature = hmac.new(TOKEN_SECRET.encode("utf-8"), signature_data, hashlib.sha256).hexdigest()
+    token = f"{user_id}.{expires_at}.{signature}"
+    return {
+        "user_id": user_id,
+        "token": token,
+        "expires_at": expires_at,
+    }
+
+
+def check_permission(user: dict[str, Any], permission: str) -> bool:
+    """Checks whether user payload contains the requested permission."""
+    permissions: list[str] = user.get("permissions", [])
+    return permission in permissions or "admin" in permissions
+
+
+def verify_token(token: str) -> dict[str, Any]:
+    """Validates bearer tokens."""
+    if not token or not isinstance(token, str):
+        raise AuthenticationError("Token is missing or malformed.")
+
+    parts = token.strip().split(".")
     if len(parts) != 3:
-        raise ValueError("Malformed JWT token segments")
-    # Verify cryptographic signature and expiry
-    header, payload, signature = parts
-    expected_sig = hmac.new(SECRET_KEY.encode(), f"{header}.{payload}".encode(), hashlib.sha256).hexdigest()
+        raise AuthenticationError("Bearer token format invalid.")
+
+    user_id, expires_str, signature = parts
+    try:
+        expires_at = int(expires_str)
+    except ValueError as exc:
+        raise AuthenticationError("Token timestamp is invalid.") from exc
+
+    current_time = int(time.time())
+    if current_time > expires_at:
+        raise AuthenticationError("Bearer token has expired.")
+
+    expected_data = f"{user_id}:{expires_at}".encode("utf-8")
+    expected_sig = hmac.new(TOKEN_SECRET.encode("utf-8"), expected_data, hashlib.sha256).hexdigest()
+
     if not hmac.compare_digest(signature, expected_sig):
-        raise PermissionError("Signature verification failed")
-    return {"sub": "user_42", "scope": "orders:write", "exp": time.time() + 3600}
+        raise AuthenticationError("Token cryptographic signature mismatch.")
 
-
-def hash_password(password: str, salt: str = "salt123") -> str:
-    """Generates secure sha256 hash for passwords."""
-    return hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
-
-
-def create_session(user_id: str, scope: str) -> str:
-    """Creates a new user session and returns bearer token."""
-    header = "eyJhbGciOiJIUzI1NiJ9"
-    payload = f"user_{user_id}_{scope}"
-    sig = hmac.new(SECRET_KEY.encode(), f"{header}.{payload}".encode(), hashlib.sha256).hexdigest()
-    return f"Bearer {header}.{payload}.{sig}"
+    return {
+        "sub": user_id,
+        "user_id": user_id,
+        "expires_at": expires_at,
+        "permissions": ["orders:create", "orders:read"],
+    }
 `,
     symbols: [
-      {
-        id: "s1000000-0000-4000-8000-000000000001",
-        name: "verify_token",
-        kind: "function",
-        range: { start_line: 12, end_line: 25 },
-      },
       {
         id: "s1000000-0000-4000-8000-000000000002",
         name: "hash_password",
         kind: "function",
-        range: { start_line: 28, end_line: 30 },
+        range: { start_line: 15, end_line: 19 },
       },
       {
         id: "s1000000-0000-4000-8000-000000000003",
         name: "create_session",
         kind: "function",
-        range: { start_line: 33, end_line: 38 },
+        range: { start_line: 22, end_line: 32 },
+      },
+      {
+        id: "s1000000-0000-4000-8000-000000000013",
+        name: "check_permission",
+        kind: "function",
+        range: { start_line: 35, end_line: 38 },
+      },
+      {
+        id: "s1000000-0000-4000-8000-000000000001",
+        name: "verify_token",
+        kind: "function",
+        range: { start_line: 41, end_line: 71 },
       },
     ],
   },
@@ -307,7 +347,7 @@ export const MOCK_SOURCE_GRAPH: SourceGraph = {
       language: "python",
       content_hash:
         "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      line_count: 38,
+      line_count: 71,
     },
     {
       id: "f1000000-0000-4000-8000-000000000002",
@@ -355,8 +395,8 @@ export const MOCK_SOURCE_GRAPH: SourceGraph = {
       qualified_name: "service.auth.verify_token",
       kind: "function",
       language: "python",
-      range: { start_line: 12, end_line: 25 },
-      docstring: "Validates incoming bearer tokens and returns payload.",
+      range: { start_line: 41, end_line: 71 },
+      docstring: "Validates bearer tokens.",
     },
     {
       id: "s1000000-0000-4000-8000-000000000002",
@@ -366,7 +406,7 @@ export const MOCK_SOURCE_GRAPH: SourceGraph = {
       qualified_name: "service.auth.hash_password",
       kind: "function",
       language: "python",
-      range: { start_line: 28, end_line: 30 },
+      range: { start_line: 15, end_line: 19 },
       docstring: "Generates secure sha256 hash for passwords.",
     },
     {
@@ -377,7 +417,7 @@ export const MOCK_SOURCE_GRAPH: SourceGraph = {
       qualified_name: "service.auth.create_session",
       kind: "function",
       language: "python",
-      range: { start_line: 33, end_line: 38 },
+      range: { start_line: 22, end_line: 32 },
       docstring: "Creates a new user session and returns bearer token.",
     },
     {
@@ -489,7 +529,7 @@ export const MOCK_SOURCE_GRAPH: SourceGraph = {
       snapshot_id: MOCK_SNAPSHOT_ID,
       file_id: "f1000000-0000-4000-8000-000000000001",
       path: "service/auth.py",
-      range: { start_line: 12, end_line: 25 },
+      range: { start_line: 41, end_line: 71 },
       content_hash:
         "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     },
@@ -656,9 +696,9 @@ export const MOCK_CHALLENGE_EVALUATIONS: Record<
       citations: [
         {
           path: "service/auth.py",
-          range: { start_line: 12, end_line: 25 },
+          range: { start_line: 41, end_line: 71 },
           snippet:
-            "def verify_token(token: str) -> Dict[str, Any]:\n    # Verify cryptographic signature and expiry",
+            'def verify_token(token: str) -> dict[str, Any]:\n    """Validates bearer tokens."""',
         },
       ],
     },
@@ -670,8 +710,8 @@ export const MOCK_CHALLENGE_EVALUATIONS: Record<
       citations: [
         {
           path: "service/auth.py",
-          range: { start_line: 12, end_line: 25 },
-          snippet: "def verify_token(token: str) -> Dict[str, Any]:",
+          range: { start_line: 41, end_line: 71 },
+          snippet: "def verify_token(token: str) -> dict[str, Any]:",
         },
       ],
     },
@@ -739,13 +779,13 @@ export const MOCK_CHALLENGE_EVALUATIONS: Record<
 export const MOCK_AI_EXPLANATIONS: Record<string, AiExplainResponse> = {
   verify_token: {
     explanation:
-      "### `verify_token` Overview\n\n`verify_token` in `service/auth.py` validates incoming bearer tokens using HMAC-SHA256 signature verification.\n\nKey behaviors:\n- Rejects requests without proper `Bearer <token>` prefixes.\n- Splits the JWT into header, payload, and signature segments.\n- Recomputes the expected HMAC-SHA256 digest with constant-time equality check (`hmac.compare_digest`) to prevent timing attacks.\n- Returns decoded user claims including subject identifier and permissions.",
+      "### `verify_token` Overview\n\n`verify_token` in `service/auth.py` validates incoming bearer tokens using HMAC-SHA256 signature verification.\n\nKey behaviors:\n- Rejects requests without proper token string format.\n- Splits the token into subject user ID, expiration timestamp, and cryptographic signature.\n- Recomputes the expected HMAC-SHA256 digest with constant-time equality check (`hmac.compare_digest`) to prevent timing attacks.\n- Returns decoded user claims including subject identifier and permissions.",
     citations: [
       {
         path: "service/auth.py",
-        range: { start_line: 12, end_line: 25 },
+        range: { start_line: 41, end_line: 71 },
         snippet:
-          "def verify_token(token: str) -> Dict[str, Any]:\n    # Verify cryptographic signature and expiry",
+          'def verify_token(token: str) -> dict[str, Any]:\n    """Validates bearer tokens."""',
       },
     ],
     provenance: "static_verified",
@@ -812,8 +852,8 @@ export const MOCK_AI_CHAT_REPLIES: Record<string, AiChatResponse> = {
       },
       {
         path: "service/auth.py",
-        range: { start_line: 12, end_line: 25 },
-        snippet: "def verify_token(token: str):",
+        range: { start_line: 41, end_line: 71 },
+        snippet: "def verify_token(token: str) -> dict[str, Any]:",
       },
       {
         path: "service/errors.py",

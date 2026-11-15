@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Copy, Check, ShieldCheck, Sparkles, FileCode } from "lucide-react";
 import { CodebaseNodeData } from "../Map/CustomNode";
 import { FileDetailResponse } from "../../lib/types";
@@ -18,6 +18,7 @@ export function SourceInspectorTab({
 }: SourceInspectorTabProps) {
   const [fileDetail, setFileDetail] = useState<FileDetailResponse | null>(null);
   const [copied, setCopied] = useState(false);
+  const codeScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!selectedNode?.path) return;
@@ -37,6 +38,20 @@ export function SourceInspectorTab({
       isCancelled = true;
     };
   }, [selectedNode?.path]);
+
+  // Auto-scroll to highlighted symbol or line range
+  const startLine = selectedNode?.range?.start_line;
+  const endLine = selectedNode?.range?.end_line;
+
+  useEffect(() => {
+    if (!startLine || !codeScrollRef.current) return;
+    const lineElement = codeScrollRef.current.querySelector(
+      `[data-line="${startLine}"]`,
+    );
+    if (lineElement) {
+      lineElement.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [fileDetail, startLine]);
 
   const handleCopy = () => {
     if (!fileDetail?.content) return;
@@ -64,8 +79,6 @@ export function SourceInspectorTab({
     (!fileDetail || fileDetail.path !== selectedNode.path),
   );
   const lines = fileDetail?.content.split("\n") || [];
-  const startLine = selectedNode.range?.start_line;
-  const endLine = selectedNode.range?.end_line;
 
   return (
     <div className={styles.container}>
@@ -139,7 +152,7 @@ export function SourceInspectorTab({
           </button>
         </div>
 
-        <div className={styles.codeScroll}>
+        <div ref={codeScrollRef} className={styles.codeScroll}>
           {isLoading ? (
             <div
               style={{ padding: "2rem", textAlign: "center", color: "#888" }}
@@ -158,6 +171,7 @@ export function SourceInspectorTab({
               return (
                 <div
                   key={lineNum}
+                  data-line={lineNum}
                   className={`${styles.codeLine} ${
                     isHighlighted ? styles.highlightedLine : ""
                   }`}

@@ -81,13 +81,13 @@
 
 .legendPanel {
   position: absolute;
-  bottom: var(--space-4);
-  left: var(--space-4);
+  top: var(--space-4);
+  right: var(--space-4);
   z-index: 10;
   background-color: var(--color-panel);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
-  padding: 0.5rem 0.75rem;
+  padding: 0.35rem 0.65rem;
   display: flex;
   align-items: center;
   gap: var(--space-3);

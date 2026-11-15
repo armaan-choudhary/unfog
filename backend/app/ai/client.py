@@ -54,7 +54,7 @@ def call_gemini_generate(
         genai = importlib.import_module("google.genai")
         types = importlib.import_module("google.genai.types")
 
-        client = genai.Client(api_key=api_key)
+        client = genai.Client(api_key=api_key, http_options={"api_version": "v1beta"})
 
         contents: list[Any] = []
         for msg in history:

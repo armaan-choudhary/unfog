@@ -33,7 +33,6 @@ export function LearningArenaTab({
   const [result, setResult] = useState<ChallengeEvaluationResponse | null>(
     null,
   );
-  const [totalScore, setTotalScore] = useState(0);
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -71,7 +70,6 @@ export function LearningArenaTab({
       setResult(evalRes);
 
       if (evalRes.is_correct && !completedIds.has(activeChallenge.id)) {
-        setTotalScore((prev) => prev + evalRes.score);
         setCompletedIds((prev) => new Set(prev).add(activeChallenge.id));
       }
     } catch {
@@ -119,11 +117,15 @@ export function LearningArenaTab({
             style={{
               marginLeft: "auto",
               fontSize: "0.75rem",
-              color: "var(--color-accent-amber)",
-              fontWeight: 700,
+              color: "var(--color-accent-teal)",
+              fontWeight: 600,
+              backgroundColor: "rgba(113, 194, 189, 0.15)",
+              padding: "0.2rem 0.5rem",
+              borderRadius: "0.375rem",
+              border: "1px solid rgba(113, 194, 189, 0.3)",
             }}
           >
-            {totalScore} PTS
+            Verified: {completedIds.size} / {challenges.length}
           </span>
         </div>
         <p className={styles.goalDescription}>
@@ -239,8 +241,8 @@ export function LearningArenaTab({
                 )}
                 <span>
                   {result.is_correct
-                    ? `Correct (+${result.score} pts)`
-                    : "Incorrect"}
+                    ? "Correct — understanding verified"
+                    : "Needs review — re-trace code evidence"}
                 </span>
               </div>
               {result.is_correct && activeIdx < challenges.length - 1 && (

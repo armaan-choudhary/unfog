@@ -27,7 +27,7 @@ export function AiCompanionTab({
       citations: [
         {
           path: "service/auth.py",
-          range: { start_line: 12, end_line: 25 },
+          range: { start_line: 41, end_line: 71 },
           snippet: "verify_token implementation",
         },
       ],

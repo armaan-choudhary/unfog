@@ -65,7 +65,29 @@ export default function DashboardPage() {
 
     fetchSourceGraph()
       .then((data) => {
-        if (isSubscribed) setGraph(data);
+        if (isSubscribed) {
+          setGraph(data);
+          // Synchronize selectedNode with authoritative symbol coordinates from live graph
+          setSelectedNode((prev) => {
+            if (!prev) return null;
+            const matching = data.symbols.find(
+              (s) => (prev.name && s.name === prev.name) || s.id === prev.id,
+            );
+            if (matching) {
+              const file = data.files.find((f) => f.id === matching.file_id);
+              return {
+                id: matching.id,
+                name: matching.name,
+                kind: matching.kind,
+                path: file?.path || prev.path,
+                qualifiedName: matching.qualified_name || undefined,
+                range: matching.range,
+                docstring: matching.docstring || undefined,
+              };
+            }
+            return prev;
+          });
+        }
       })
       .catch((err) => {
         console.warn("Failed to fetch source graph:", err);
@@ -89,12 +111,17 @@ export default function DashboardPage() {
       setHighlightedPath(citation.path);
 
       // Find if there is a matching symbol in this path and range
-      const matchingSym = graph.symbols.find(
-        (s) =>
-          citation.range &&
-          s.range.start_line <= citation.range.start_line &&
-          s.range.end_line >= citation.range.end_line,
-      );
+      const matchingSym = graph.symbols.find((s) => {
+        const file = graph.files.find((f) => f.id === s.file_id);
+        if (file && file.path !== citation.path) return false;
+        if (!citation.range) return false;
+        return (
+          (s.range.start_line <= citation.range.start_line &&
+            s.range.end_line >= citation.range.end_line) ||
+          (citation.range.start_line <= s.range.start_line &&
+            citation.range.end_line >= s.range.end_line)
+        );
+      });
 
       if (matchingSym) {
         setSelectedNode({
@@ -103,7 +130,7 @@ export default function DashboardPage() {
           kind: matchingSym.kind,
           path: citation.path,
           qualifiedName: matchingSym.qualified_name || undefined,
-          range: citation.range,
+          range: citation.range || matchingSym.range,
           docstring: matchingSym.docstring || undefined,
         });
       } else {
@@ -120,7 +147,7 @@ export default function DashboardPage() {
       // Switch to Source Inspector tab so the code snippet is visible immediately
       setActiveTab("source");
     },
-    [graph.symbols],
+    [graph],
   );
 
   return (

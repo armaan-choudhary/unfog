@@ -89,7 +89,13 @@ async function runBrowserVerification() {
     if (!sourceContent.includes("service/auth.py")) {
       throw new Error("Source inspector did not display path 'service/auth.py'");
     }
-    console.log("  ✔ Verified Source Inspector: Shows 'service/auth.py' and exact 'verify_token' source code");
+    if (sourceContent.includes("L12 – L25") || sourceContent.includes("12-25")) {
+      throw new Error("Source inspector still showing stale line range 12-25!");
+    }
+    if (!sourceContent.includes("41") || !sourceContent.includes("71")) {
+      throw new Error("Source inspector missing authoritative line range 41-71!");
+    }
+    console.log("  ✔ Verified Source Inspector: Shows 'service/auth.py', authoritative range L41–L71, and exact 'verify_token' source code");
 
     // -------------------------------------------------------------------------
     // Step 5: Ask Gemini to Explain Selected Functionality
@@ -121,6 +127,9 @@ async function runBrowserVerification() {
     await citationBadge.waitFor({ state: "visible", timeout: 5000 });
     const citationText = await citationBadge.textContent();
     console.log(`  ✔ Found citation badge: "${citationText.trim()}"`);
+    if (citationText.includes("12-25") || citationText.includes("12–25")) {
+      throw new Error(`Found citation badge with stale 12-25 line range: "${citationText}"`);
+    }
 
     // Click citation to navigate to source inspector
     await citationBadge.click();
