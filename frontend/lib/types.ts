@@ -9,6 +9,7 @@ export type SymbolKind =
   | "module"
   | "variable"
   | "property"
+  | "component"
   | "unknown";
 
 export type EdgeKind =
@@ -171,20 +172,6 @@ export interface ChallengeEvaluationResponse {
   citations: CitationRef[];
 }
 
-export interface GitHubRepoInfo {
-  owner: string;
-  repo: string;
-  full_name: string;
-  description: string | null;
-  html_url: string;
-  default_branch: string;
-  visibility: string;
-  language: string | null;
-  is_python: boolean;
-  stars: number;
-  forks: number;
-}
-
 export interface GithubImportResponse {
   repo_id: string;
   owner: string;
@@ -192,6 +179,20 @@ export interface GithubImportResponse {
   commit_sha: string;
   default_branch: string;
   file_count: number;
+}
+
+export interface GitHubRepoInfo {
+  owner: string;
+  repo: string;
+  full_name: string;
+  description?: string | null;
+  html_url: string;
+  default_branch: string;
+  visibility: string;
+  language?: string | null;
+  is_python?: boolean;
+  is_supported?: boolean;
+  languages?: string[];
 }
 
 export interface RepositoryOption {

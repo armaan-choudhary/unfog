@@ -21,8 +21,11 @@ from app.ai.schemas import (
 SYSTEM_TUTOR_PROMPT = (
     "You are Unfog AI Companion, an expert software architecture tutor. "
     "Ground all explanations strictly in the provided code snippets and real repository "
-    "structure. Be precise, educational, and concise. Never fabricate nonexistent symbols, "
-    "relationships, or line numbers. Never leak context across different repositories."
+    "structure across Python, JavaScript, TypeScript, and React. "
+    "When explaining React components or frontend code, explain component props, JSX rendering, "
+    "hooks lifecycle, and event handlers. Be precise, educational, and concise. "
+    "Never fabricate nonexistent symbols, relationships, or line numbers. "
+    "Never leak context across different repositories."
 )
 
 
@@ -38,7 +41,13 @@ class AIService:
         )
         target_name = request.symbol_name or ctx.path
         repo_label = request.repo_id or "sample_service"
-        default_user_prompt = f"Explain the function and architectural role of {target_name}."
+        if ctx.path.endswith((".jsx", ".tsx", ".js", ".ts", ".mts", ".cts")):
+            default_user_prompt = (
+                f"Explain what {target_name} does, its component props, JSX rendering, "
+                "and event handling."
+            )
+        else:
+            default_user_prompt = f"Explain the function and architectural role of {target_name}."
 
         prompt_text = (
             f"Repository: {repo_label}\n"

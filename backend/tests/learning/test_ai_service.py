@@ -255,3 +255,65 @@ def test_ai_service_multi_repo_explain_and_chat(
     chat_resp = service.chat(chat_req)
     assert chat_resp.model == "offline-fallback"
     assert "repo_xyz" in chat_resp.reply
+
+
+def test_js_ts_symbol_extraction() -> None:
+    tsx_source = (
+        "import React from 'react';\n"
+        "\n"
+        "interface Props {\n"
+        "  name: string;\n"
+        "}\n"
+        "\n"
+        "export function ProfileCard({ name }: Props) {\n"
+        "  return (\n"
+        '    <div className="card">\n'
+        "      <h2>{name}</h2>\n"
+        "    </div>\n"
+        "  );\n"
+        "}\n"
+    )
+    res = extract_symbol_from_source(
+        tsx_source,
+        "ProfileCard",
+        file_path="components/ProfileCard.tsx",
+    )
+    assert res is not None
+    start, end, snippet = res
+    assert start == 7
+    assert end == 13
+    assert "ProfileCard" in snippet
+    assert '<div className="card">' in snippet
+
+
+def test_react_component_explain_offline(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    temp_dir = tmp_path / "react_repo"
+    temp_dir.mkdir()
+    comp_file = temp_dir / "Button.tsx"
+    comp_file.write_text(
+        "export function Button({ label }: { label: string }) {\n"
+        "  return <button>{label}</button>;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    def fake_find_repo_root(repo_id: str | None = None):
+        if repo_id == "react_app":
+            return temp_dir
+        from app.ai.context import find_sample_repo_root
+
+        return find_sample_repo_root()
+
+    monkeypatch.setattr("app.ai.context.find_repo_root", fake_find_repo_root)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+    service = AIService()
+    req = ExplainRequest(
+        path="Button.tsx",
+        symbol_name="Button",
+        repo_id="react_app",
+    )
+    resp = service.explain(req)
+    assert resp.model == "offline-fallback"
+    assert "Button.tsx" in resp.citations[0].path
+    assert "frontend presentation" in resp.explanation or "react_app" in resp.explanation

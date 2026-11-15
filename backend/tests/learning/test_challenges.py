@@ -180,3 +180,81 @@ def test_dynamic_locate_challenge_generation(tmp_path: pytest.TempPathFactory) -
     pub = challenge.to_public_challenge()
     assert pub.id == challenge.id
     assert not hasattr(pub, "correct_answer")
+
+
+def test_dynamic_locate_react_component_challenge() -> None:
+    from uuid import uuid4
+
+    from app.codeintel.models import (
+        LineRange as IntelLineRange,
+    )
+    from app.codeintel.models import (
+        SnapshotInfo,
+        SnapshotRevision,
+        SourceFile,
+        SourceGraph,
+        SourceSymbol,
+    )
+    from app.learning.challenges import generate_locate_challenge_for_graph
+
+    snap_id = uuid4()
+    file_id = uuid4()
+    sym_id = uuid4()
+    distract_id = uuid4()
+
+    graph = SourceGraph(
+        schema_version="1.0",
+        snapshot=SnapshotInfo(
+            id=snap_id,
+            repository_id=uuid4(),
+            repository_name="armaan-portfolio",
+            revision=SnapshotRevision(kind="git_commit", value="commit999"),
+            manifest_hash="sha256:" + "c" * 64,
+        ),
+        files=[
+            SourceFile(
+                id=file_id,
+                snapshot_id=snap_id,
+                path="components/Hero.tsx",
+                language="typescript",
+                content_hash="sha256:" + "d" * 64,
+                line_count=45,
+            )
+        ],
+        symbols=[
+            SourceSymbol(
+                id=sym_id,
+                snapshot_id=snap_id,
+                file_id=file_id,
+                name="HeroSection",
+                qualified_name="components.Hero.HeroSection",
+                kind="component",
+                language="typescript",
+                range=IntelLineRange(start_line=8, end_line=30),
+                docstring="Hero banner section component with animated intro.",
+            ),
+            SourceSymbol(
+                id=distract_id,
+                snapshot_id=snap_id,
+                file_id=file_id,
+                name="Navbar",
+                qualified_name="components.Hero.Navbar",
+                kind="component",
+                language="typescript",
+                range=IntelLineRange(start_line=32, end_line=44),
+            ),
+        ],
+        citations=[],
+        edges=[],
+    )
+
+    challenge = generate_locate_challenge_for_graph(graph, "armaan-portfolio")
+    assert challenge.id == "challenge-locate-armaan-portfolio"
+    assert challenge.type == "locate"
+    assert "React Component" in challenge.title
+    assert "Hero banner section component" in challenge.prompt or "HeroSection" in challenge.prompt
+    assert "React component" in challenge.prompt
+    assert challenge.correct_answer == "HeroSection"
+    assert "HeroSection" in challenge.options
+    assert len(challenge.options) == 4
+    assert "React component `HeroSection`" in challenge.correct_feedback

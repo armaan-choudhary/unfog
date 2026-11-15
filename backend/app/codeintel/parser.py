@@ -11,6 +11,7 @@ import tree_sitter
 import tree_sitter_python
 
 from app.codeintel.hasher import compute_content_hash
+from app.codeintel.models import SymbolKind
 
 _PY_LANGUAGE = tree_sitter.Language(tree_sitter_python.language())
 _TREE_SITTER_PARSER = tree_sitter.Parser(_PY_LANGUAGE)
@@ -20,16 +21,7 @@ _TREE_SITTER_PARSER = tree_sitter.Parser(_PY_LANGUAGE)
 class RawSymbol:
     name: str
     qualified_name: str
-    kind: Literal[
-        "function",
-        "class",
-        "method",
-        "interface",
-        "module",
-        "variable",
-        "property",
-        "unknown",
-    ]
+    kind: SymbolKind
     start_line: int
     end_line: int
     docstring: str | None
@@ -61,6 +53,14 @@ class RawInheritance:
 
 
 @dataclass
+class RawRender:
+    caller_qualified_name: str
+    component_name: str
+    start_line: int
+    end_line: int
+
+
+@dataclass
 class ParsedModule:
     path: str
     module_name: str
@@ -72,19 +72,23 @@ class ParsedModule:
     calls: list[RawCall] = field(default_factory=list)
     inheritances: list[RawInheritance] = field(default_factory=list)
     assigned_instances: dict[str, str] = field(default_factory=dict)
+    renders: list[RawRender] = field(default_factory=list)
     tree_sitter_node_count: int = 0
     tree_sitter_valid: bool = True
 
 
 def path_to_module_name(relative_path: str) -> str:
-    """Converts a relative POSIX file path to a Python module path."""
+    """Converts a relative POSIX file path to a logical module path."""
     posix = PurePosixPath(relative_path)
     parts = list(posix.parts)
     if not parts:
         return ""
-    if parts[-1].endswith(".py"):
-        parts[-1] = parts[-1][:-3]
-    if parts[-1] == "__init__":
+    suffixes = (".py", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".mts", ".cts")
+    for suf in suffixes:
+        if parts[-1].endswith(suf):
+            parts[-1] = parts[-1][: -len(suf)]
+            break
+    if parts[-1] in ("__init__", "index"):
         parts.pop()
     return ".".join(parts)
 
@@ -298,4 +302,25 @@ def parse_python_source(relative_path: str, source_code: str) -> ParsedModule:
         assigned_instances=visitor.assigned_instances,
         tree_sitter_node_count=node_count,
         tree_sitter_valid=tree_valid,
+    )
+
+
+def parse_source_file(relative_path: str, source_code: str) -> ParsedModule:
+    """Dispatches source file parsing to Python AST or Tree-sitter JS/TS parser."""
+    ext = PurePosixPath(relative_path).suffix.lower()
+    if ext == ".py":
+        return parse_python_source(relative_path, source_code)
+    if ext in {".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".mts", ".cts"}:
+        from app.codeintel.js_parser import parse_js_ts_source
+
+        return parse_js_ts_source(relative_path, source_code)
+
+    lines = source_code.splitlines()
+    return ParsedModule(
+        path=relative_path,
+        module_name=path_to_module_name(relative_path),
+        content=source_code,
+        content_hash=compute_content_hash(source_code),
+        line_count=len(lines),
+        tree_sitter_valid=True,
     )

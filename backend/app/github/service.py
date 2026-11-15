@@ -10,6 +10,8 @@ from app.github.client import GitHubClient
 from app.github.schemas import GitHubImportResponse, GitHubRepoInfo, RepositoryMetadata
 from app.github.validator import validate_github_url
 
+SUPPORTED_PRIMARY_LANGUAGES = frozenset({"python", "javascript", "typescript", "jsx", "tsx"})
+
 
 class GitHubService:
     """Orchestrates secure public GitHub repository ingestion."""
@@ -60,6 +62,10 @@ class GitHubService:
             repository_name=full_name,
         )
 
+        lang = repo_details.get("language")
+        lang_str = str(lang).strip().lower() if lang else ""
+        is_supported = bool(lang_str in SUPPORTED_PRIMARY_LANGUAGES) if lang else True
+
         metadata = RepositoryMetadata(
             name=repo_details.get("name") or repo,
             full_name=full_name,
@@ -67,7 +73,8 @@ class GitHubService:
             html_url=repo_details.get("html_url") or f"https://github.com/{owner}/{repo}",
             default_branch=default_branch,
             visibility="public",
-            language=repo_details.get("language"),
+            language=lang,
+            is_supported=is_supported,
             stars=repo_details.get("stargazers_count", 0),
             forks=repo_details.get("forks_count", 0),
             open_issues=repo_details.get("open_issues_count", 0),
@@ -89,7 +96,9 @@ class GitHubService:
         owner, repo = validate_github_url(url)
         repo_details = self.client.get_repo_details(owner, repo)
         lang = repo_details.get("language")
-        is_python = bool(lang and str(lang).strip().lower() == "python")
+        lang_str = str(lang).strip().lower() if lang else ""
+        is_python = bool(lang_str == "python")
+        is_supported = bool(lang_str in SUPPORTED_PRIMARY_LANGUAGES) if lang else True
 
         return GitHubRepoInfo(
             owner=owner,
@@ -101,6 +110,7 @@ class GitHubService:
             visibility="public",
             language=lang,
             is_python=is_python,
+            is_supported=is_supported,
             stars=repo_details.get("stargazers_count", 0),
             forks=repo_details.get("forks_count", 0),
         )

@@ -31,6 +31,10 @@ class RepositoryMetadata(BaseModel):
     language: str | None = Field(
         default=None, description="Primary repository language reported by GitHub"
     )
+    is_supported: bool = Field(
+        default=True,
+        description="Whether primary repository language is supported (Python, JS, TS)",
+    )
     stars: int = Field(default=0, description="Stargazers count")
     forks: int = Field(default=0, description="Forks count")
     open_issues: int = Field(default=0, description="Open issues count")
@@ -53,6 +57,10 @@ class GitHubRepoInfo(BaseModel):
     )
     is_python: bool = Field(
         default=False, description="Whether primary repository language is Python"
+    )
+    is_supported: bool = Field(
+        default=True,
+        description="Whether primary repository language is supported (Python, JS, TS)",
     )
     stars: int = Field(default=0, description="Stargazers count")
     forks: int = Field(default=0, description="Forks count")

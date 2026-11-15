@@ -169,6 +169,28 @@
   color: #e2dfec;
 }
 
+.syntaxKeyword {
+  color: #c4b5fd;
+  font-weight: 600;
+}
+
+.syntaxString {
+  color: #86efac;
+}
+
+.syntaxComment {
+  color: #6b7280;
+  font-style: italic;
+}
+
+.syntaxNumber {
+  color: #fdba74;
+}
+
+.syntaxTag {
+  color: #67e8f9;
+}
+
 .emptyState {
   display: flex;
   flex-direction: column;

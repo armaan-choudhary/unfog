@@ -16,9 +16,17 @@ def get_deterministic_explanation(
     if repo_id and repo_id not in ("sample_service", "bundled"):
         line_info = f"lines {context.range.start_line}–{context.range.end_line}"
         header = f"Code analysis for `{symbol_name or path}` in repository `{repo_id}`"
+        is_frontend = path.endswith((".jsx", ".tsx", ".js", ".ts", ".mts", ".cts"))
+        if is_frontend:
+            role = (
+                f"This component or module implements frontend presentation in `{path}`. "
+                "It defines UI rendering structure, component props, and event handling. "
+            )
+        else:
+            role = f"This symbol defines the {symbol_name or 'module'} implementation. "
         return (
             f"{header} ({path}, {line_info}):\n\n"
-            f"This symbol defines the {symbol_name or 'module'} implementation. "
+            f"{role}"
             "In offline fallback mode, automated generative explanations are disabled. "
             "Refer to the exact source lines cited above for implementation logic."
         )

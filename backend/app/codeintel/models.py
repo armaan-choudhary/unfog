@@ -18,6 +18,7 @@ SymbolKind = Literal[
     "module",
     "variable",
     "property",
+    "component",
     "unknown",
 ]
 

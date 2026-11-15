@@ -109,6 +109,10 @@
   border-radius: 50%;
 }
 
+.legendDot.comp {
+  background-color: #5eead4;
+}
+
 .legendDot.func {
   background-color: var(--color-accent-violet);
 }

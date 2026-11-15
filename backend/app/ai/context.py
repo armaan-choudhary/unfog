@@ -9,6 +9,10 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+import tree_sitter
+import tree_sitter_javascript as tsjs
+import tree_sitter_typescript as tsts
+
 from app.ai.schemas import CodeCitation, LineRange
 
 SAFE_PATH_PATTERN = re.compile(r"^(?!/)(?!.*(?:^|/)\.\.?(?:/|$))[^\\]+$")
@@ -254,29 +258,126 @@ def resolve_file_on_disk(rel_path: str, repo_id: str | None = None) -> tuple[Pat
     return None
 
 
-def extract_symbol_from_source(
-    source_code: str, symbol_name: str | None
+def extract_js_ts_symbol_from_source(
+    source_code: str,
+    symbol_name: str | None,
+    ext: str,
 ) -> tuple[int, int, str] | None:
-    """Parse Python source AST to find symbol start and end lines."""
+    """Parse JS/TS/JSX/TSX source via Tree-sitter to locate functions and React components."""
     if not symbol_name:
         return None
-    try:
-        tree = ast.parse(source_code)
-    except SyntaxError:
+
+    bytes_code = source_code.encode("utf-8")
+    parser = tree_sitter.Parser()
+    if ext in (".tsx", ".jsx"):
+        lang = tree_sitter.Language(tsts.language_tsx())
+    elif ext in (".ts", ".mts", ".cts"):
+        lang = tree_sitter.Language(tsts.language_typescript())
+    else:
+        lang = tree_sitter.Language(tsjs.language())
+
+    parser.language = lang
+    tree = parser.parse(bytes_code)
+
+    def find_node(node: tree_sitter.Node) -> tree_sitter.Node | None:
+        decl_types = (
+            "function_declaration",
+            "generator_function_declaration",
+            "class_declaration",
+            "interface_declaration",
+            "type_alias_declaration",
+        )
+        if node.type in decl_types:
+            for child in node.children:
+                if child.type in ("identifier", "type_identifier"):
+                    if child.text and child.text.decode("utf-8") == symbol_name:
+                        if node.parent and node.parent.type == "export_statement":
+                            return node.parent
+                        return node
+
+        if node.type == "variable_declarator":
+            id_child = node.child_by_field_name("name")
+            if id_child and id_child.text and id_child.text.decode("utf-8") == symbol_name:
+                parent = node.parent
+                if parent and parent.type in ("variable_declaration", "lexical_declaration"):
+                    if parent.parent and parent.parent.type == "export_statement":
+                        return parent.parent
+                    return parent
+                return node
+
+        for child in node.children:
+            res = find_node(child)
+            if res:
+                return res
         return None
 
+    target_node = find_node(tree.root_node)
+    if target_node:
+        start_line = target_node.start_point.row + 1
+        end_line = target_node.end_point.row + 1
+        lines = source_code.splitlines(keepends=True)
+        snippet = "".join(lines[start_line - 1 : end_line]).rstrip()
+        return start_line, end_line, snippet
+
+    return None
+
+
+def extract_symbol_from_source(
+    source_code: str,
+    symbol_name: str | None,
+    file_path: str = "",
+) -> tuple[int, int, str] | None:
+    """Locate symbol start and end lines across Python, JavaScript, and TypeScript sources."""
+    if not symbol_name:
+        return None
+
+    ext = Path(file_path).suffix.lower() if file_path else ""
+    if ext in (".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".mts", ".cts"):
+        extracted = extract_js_ts_symbol_from_source(source_code, symbol_name, ext)
+        if extracted:
+            return extracted
+
+    # Try Python AST
+    try:
+        tree = ast.parse(source_code)
+        lines = source_code.splitlines(keepends=True)
+        total_lines = len(lines)
+
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                if node.name == symbol_name:
+                    start = getattr(node, "lineno", 1)
+                    end = getattr(node, "end_lineno", min(start + 15, total_lines))
+                    start_clamped = max(1, min(start, total_lines))
+                    end_clamped = max(start_clamped, min(end, total_lines))
+                    snippet = "".join(lines[start_clamped - 1 : end_clamped]).rstrip()
+                    return start_clamped, end_clamped, snippet
+    except SyntaxError:
+        pass
+
+    # If not Python or AST didn't match, attempt Tree-sitter JS/TS as fallback
+    if ext not in (".js", ".jsx", ".ts", ".tsx"):
+        for try_ext in (".tsx", ".ts", ".js"):
+            try:
+                extracted = extract_js_ts_symbol_from_source(source_code, symbol_name, try_ext)
+                if extracted:
+                    return extracted
+            except Exception:
+                pass
+
+    # Fallback regex search
     lines = source_code.splitlines(keepends=True)
     total_lines = len(lines)
-
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            if node.name == symbol_name:
-                start = getattr(node, "lineno", 1)
-                end = getattr(node, "end_lineno", min(start + 15, total_lines))
-                start_clamped = max(1, min(start, total_lines))
-                end_clamped = max(start_clamped, min(end, total_lines))
-                snippet = "".join(lines[start_clamped - 1 : end_clamped]).rstrip()
-                return start_clamped, end_clamped, snippet
+    escaped_sym = re.escape(symbol_name)
+    pattern = re.compile(
+        rf"(?:export\s+(?:default\s+)?)?(?:function|class|const|let|var|def)\s+{escaped_sym}\b"
+    )
+    for idx, line in enumerate(lines):
+        if pattern.search(line):
+            s = idx + 1
+            e = min(total_lines, s + 15)
+            snippet = "".join(lines[s - 1 : e]).rstrip()
+            return s, e, snippet
 
     return None
 
@@ -290,6 +391,29 @@ def retrieve_symbol_context(
 ) -> RetrievedContext:
     """Retrieve grounded code context for a file or symbol with verified line ranges."""
     safe_path = validate_safe_path(path)
+
+    # If repo has indexed graph, look up precise symbol coordinates first
+    if symbol_name and (start_line is None or end_line is None) and repo_id:
+        try:
+            from app.codeintel.service import get_codebase_service
+
+            svc = get_codebase_service()
+            graph = svc.get_graph(repo_id)
+            matching_file = next((f for f in graph.files if f.path == safe_path), None)
+            if matching_file:
+                sym_obj = next(
+                    (
+                        s
+                        for s in graph.symbols
+                        if s.file_id == matching_file.id and s.name == symbol_name
+                    ),
+                    None,
+                )
+                if sym_obj:
+                    start_line = sym_obj.range.start_line
+                    end_line = sym_obj.range.end_line
+        except Exception:
+            pass
 
     disk_result = resolve_file_on_disk(safe_path, repo_id=repo_id)
     if disk_result:
@@ -308,7 +432,7 @@ def retrieve_symbol_context(
                 content_hash=compute_sha256(snip),
             )
 
-        extracted = extract_symbol_from_source(content, symbol_name)
+        extracted = extract_symbol_from_source(content, symbol_name, file_path=safe_path)
         if extracted:
             s, e, snip = extracted
             return RetrievedContext(

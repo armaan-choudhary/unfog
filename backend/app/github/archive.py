@@ -19,6 +19,20 @@ MAX_FILE_COUNT = 1000
 MAX_ARCHIVE_MEMBERS = 10000
 DEFAULT_SANDBOX_BASE = Path("/tmp/unfog_repos")
 
+SUPPORTED_EXTENSIONS = frozenset(
+    {
+        ".py",
+        ".js",
+        ".jsx",
+        ".ts",
+        ".tsx",
+        ".mjs",
+        ".cjs",
+        ".mts",
+        ".cts",
+    }
+)
+
 IGNORED_DIR_NAMES = frozenset(
     {
         ".git",
@@ -39,6 +53,21 @@ IGNORED_DIR_NAMES = frozenset(
         "build",
         "dist",
         "site-packages",
+        ".next",
+        ".vite",
+        "out",
+        "coverage",
+        ".nuxt",
+        ".turbo",
+    }
+)
+
+LOCKFILE_NAMES = frozenset(
+    {
+        "package-lock.json",
+        "yarn.lock",
+        "pnpm-lock.yaml",
+        "bun.lockb",
     }
 )
 
@@ -85,6 +114,10 @@ def should_ignore_path(relative_path: PurePosixPath) -> bool:
     filename = relative_path.name
     filename_lower = filename.lower()
 
+    # Lockfiles
+    if filename_lower in LOCKFILE_NAMES:
+        return True
+
     # Dotfiles (.env, .gitignore, etc.)
     if filename.startswith("."):
         return True
@@ -100,8 +133,16 @@ def should_ignore_path(relative_path: PurePosixPath) -> bool:
     if CREDENTIAL_KEYWORD_PATTERN.search(filename):
         return True
 
-    # Non-Python files: only .py files are retained
-    if suffix != ".py":
+    # Minified files
+    if (
+        filename_lower.endswith(".min.js")
+        or filename_lower.endswith(".min.mjs")
+        or filename_lower.endswith(".bundle.js")
+    ):
+        return True
+
+    # Supported source files: Python, JS/JSX, TS/TSX
+    if suffix not in SUPPORTED_EXTENSIONS:
         return True
 
     return False
@@ -154,7 +195,9 @@ def extract_tarball_safely(
             common_root: str | None = None
             if members:
                 first_parts = PurePosixPath(members[0].name.replace("\\", "/")).parts
-                if first_parts and not first_parts[0].endswith(".py"):
+                if first_parts and not any(
+                    first_parts[0].endswith(ext) for ext in SUPPORTED_EXTENSIONS
+                ):
                     candidate = first_parts[0]
                     if any(
                         len(PurePosixPath(m.name.replace("\\", "/")).parts) > 1 for m in members
@@ -292,14 +335,13 @@ def extract_tarball_safely(
                 os.chmod(target_file, 0o600)
                 extracted_file_count += 1
 
-            # Validate that at least one Python file was extracted
+            # Validate that at least one supported source file was extracted
             if extracted_file_count == 0:
                 raise ApplicationError(
                     code=ErrorCode.INVALID_REQUEST,
                     message=(
-                        "No supported Python source files found in repository. "
-                        "This repository doesn't contain supported Python files. "
-                        "Unfog currently supports Python repositories."
+                        "No supported source files (Python, JavaScript, TypeScript) "
+                        "found in repository."
                     ),
                     status_code=422,
                 )

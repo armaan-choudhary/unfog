@@ -10,7 +10,7 @@ from typing import Any
 
 from app.codeintel.hasher import compute_content_hash
 from app.codeintel.models import FileDetailResponse, FileSymbolSummary, SourceGraph
-from app.codeintel.scanner import build_source_graph
+from app.codeintel.scanner import build_source_graph, detect_file_language
 from app.core.errors import ApplicationError, ErrorCode
 
 DEFAULT_REPO_ID = "sample_service"
@@ -225,7 +225,7 @@ class CodebaseService:
 
         return FileDetailResponse(
             path=clean_path,
-            language="python",
+            language=detect_file_language(clean_path),
             line_count=line_count,
             content=content,
             content_hash=content_hash,

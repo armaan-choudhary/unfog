@@ -253,6 +253,15 @@ class TestIgnoreFilters:
             ".ruff_cache/0.1/bar",
             "build/lib/mod.py",
             "dist/pkg-0.1.tar.gz",
+            ".next/server/page.js",
+            ".vite/deps/react.js",
+            "out/index.js",
+            "coverage/lcov.info",
+            "package-lock.json",
+            "yarn.lock",
+            "pnpm-lock.yaml",
+            "bun.lockb",
+            "app.min.js",
             "foo.egg-info/PKG-INFO",
             ".env",
             ".env.production",
@@ -275,13 +284,25 @@ class TestIgnoreFilters:
 
         assert should_ignore_path(PurePosixPath(ignored_path)) is True
 
-    def test_allowed_python_files(self) -> None:
+    @pytest.mark.parametrize(
+        "allowed_path",
+        [
+            "main.py",
+            "service/auth.py",
+            "index.js",
+            "src/App.jsx",
+            "src/index.ts",
+            "components/Button.tsx",
+            "utils.mjs",
+            "config.cjs",
+            "api.mts",
+            "client.cts",
+        ],
+    )
+    def test_allowed_source_files(self, allowed_path: str) -> None:
         from pathlib import PurePosixPath
 
-        assert should_ignore_path(PurePosixPath("main.py")) is False
-        assert should_ignore_path(PurePosixPath("service/auth.py")) is False
-        assert should_ignore_path(PurePosixPath("app/core/config.py")) is False
-        assert should_ignore_path(PurePosixPath("tests/test_api.py")) is False
+        assert should_ignore_path(PurePosixPath(allowed_path)) is False
 
     def test_archive_with_mixed_contents_filters_properly(self, tmp_path: Path) -> None:
         tarball = _make_tarball(
@@ -341,21 +362,46 @@ class TestSizeLimits:
         assert exc_info.value.status_code == 413
         assert "file count" in exc_info.value.message.lower()
 
-    def test_no_python_files_raises_422(self, tmp_path: Path) -> None:
+    def test_no_supported_files_raises_422(self, tmp_path: Path) -> None:
         tarball = _make_tarball(
             {
-                "repo/README.md": "# No python here",
+                "repo/README.md": "# No code here",
                 "repo/package.json": "{}",
-                "repo/index.js": "console.log('hi')",
+                "repo/style.css": "body { color: red; }",
             }
         )
         repo_id = uuid4()
         with pytest.raises(ApplicationError) as exc_info:
             extract_tarball_safely(tarball, repo_id, sandbox_base=tmp_path)
         assert exc_info.value.status_code == 422
-        assert "no supported python source files" in exc_info.value.message.lower()
+        assert "no supported source files" in exc_info.value.message.lower()
         # Verify sandbox directory cleaned up
         assert not (tmp_path / str(repo_id)).exists()
+
+    def test_javascript_typescript_archive_extracted(self, tmp_path: Path) -> None:
+        tarball = _make_tarball(
+            {
+                "owner-jsrepo-abc1234/src/App.tsx": (
+                    "export function App() { return <div>App</div>; }"
+                ),
+                "owner-jsrepo-abc1234/src/utils.ts": (
+                    "export const sum = (a: number, b: number) => a + b;"
+                ),
+                "owner-jsrepo-abc1234/index.js": "console.log('hello');",
+                "owner-jsrepo-abc1234/components/Card.jsx": "export const Card = () => <div />;",
+                "owner-jsrepo-abc1234/package-lock.json": "{}",
+                "owner-jsrepo-abc1234/dist/bundle.js": "minified",
+            }
+        )
+        repo_id = uuid4()
+        dest_dir, file_count = extract_tarball_safely(tarball, repo_id, sandbox_base=tmp_path)
+        assert file_count == 4
+        assert (dest_dir / "src/App.tsx").exists()
+        assert (dest_dir / "src/utils.ts").exists()
+        assert (dest_dir / "index.js").exists()
+        assert (dest_dir / "components/Card.jsx").exists()
+        assert not (dest_dir / "package-lock.json").exists()
+        assert not (dest_dir / "dist").exists()
 
     def test_client_download_tarball_size_overflow_rejected(self) -> None:
         client = GitHubClient()
@@ -571,18 +617,18 @@ class TestGitHubImportAPI:
         assert response.status_code == 413
         assert "25mb" in response.json()["error"]["message"].lower()
 
-    def test_import_no_python_files_returns_422(self) -> None:
+    def test_import_no_supported_files_returns_422(self) -> None:
         empty_tarball = _make_tarball(
             {
-                "owner-jsrepo-123/README.md": "# JavaScript Project",
-                "owner-jsrepo-123/index.js": "console.log('hello')",
+                "owner-norepo-123/README.md": "# Documentation only",
+                "owner-norepo-123/notes.txt": "just some text",
             }
         )
 
         mock_client = MagicMock()
         mock_client.get_repo_details.return_value = {
-            "name": "jsrepo",
-            "full_name": "owner/jsrepo",
+            "name": "norepo",
+            "full_name": "owner/norepo",
             "default_branch": "main",
         }
         mock_client.get_commit_sha.return_value = "commit123"
@@ -595,13 +641,11 @@ class TestGitHubImportAPI:
         response = _post_json(
             app,
             "/api/v1/github/import",
-            {"url": "https://github.com/owner/jsrepo"},
+            {"url": "https://github.com/owner/norepo"},
         )
         assert response.status_code == 422
         err_msg = response.json()["error"]["message"]
-        assert "no supported python source files" in err_msg.lower()
-        assert "this repository doesn't contain supported python files" in err_msg.lower()
-        assert "unfog currently supports python repositories" in err_msg.lower()
+        assert "no supported source files" in err_msg.lower()
 
     def test_get_repo_info_python_repo(self) -> None:
         mock_client = MagicMock()
@@ -627,9 +671,10 @@ class TestGitHubImportAPI:
         assert data["repo"] == "click"
         assert data["language"] == "Python"
         assert data["is_python"] is True
+        assert data["is_supported"] is True
         assert data["stars"] == 15000
 
-    def test_get_repo_info_non_python_repo(self) -> None:
+    def test_get_repo_info_typescript_repo(self) -> None:
         mock_client = MagicMock()
         mock_client.get_repo_details.return_value = {
             "name": "portfolio",
@@ -653,6 +698,33 @@ class TestGitHubImportAPI:
         assert data["repo"] == "portfolio"
         assert data["language"] == "TypeScript"
         assert data["is_python"] is False
+        assert data["is_supported"] is True
+
+    def test_get_repo_info_unsupported_repo(self) -> None:
+        mock_client = MagicMock()
+        mock_client.get_repo_details.return_value = {
+            "name": "rust-tool",
+            "full_name": "developer/rust-tool",
+            "description": "A tool written in Rust",
+            "html_url": "https://github.com/developer/rust-tool",
+            "default_branch": "main",
+            "language": "Rust",
+            "stargazers_count": 10,
+            "forks_count": 2,
+        }
+
+        service = GitHubService(client=mock_client)
+        app = create_app(_settings())
+        app.dependency_overrides[get_github_service] = lambda: service
+
+        response = _get_json(app, "/api/v1/github/info?url=https://github.com/developer/rust-tool")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["owner"] == "developer"
+        assert data["repo"] == "rust-tool"
+        assert data["language"] == "Rust"
+        assert data["is_python"] is False
+        assert data["is_supported"] is False
 
     def test_import_with_long_docstring_succeeds(self) -> None:
         long_doc = '"""' + ("A" * 5000) + '"""\n'

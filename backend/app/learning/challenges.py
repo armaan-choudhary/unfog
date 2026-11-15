@@ -127,7 +127,9 @@ def generate_locate_challenge_for_graph(graph: Any, repo_id: str) -> ChallengeDe
     symbols = getattr(graph, "symbols", [])
     files = getattr(graph, "files", [])
 
-    candidates = [s for s in symbols if getattr(s, "kind", "") in ("function", "class", "method")]
+    candidates = [
+        s for s in symbols if getattr(s, "kind", "") in ("function", "class", "method", "component")
+    ]
     if not candidates:
         candidates = list(symbols)
 
@@ -175,8 +177,12 @@ def generate_locate_challenge_for_graph(graph: Any, repo_id: str) -> ChallengeDe
     doc = getattr(target, "docstring", "") or ""
     clean_doc = doc.strip().splitlines()[0].rstrip(".") if doc.strip() else ""
 
+    is_component = getattr(target, "kind", "") == "component"
     if clean_doc and len(clean_doc) > 6:
-        prompt = f'Which symbol in `{target_path}` is responsible for: "{clean_doc}"?'
+        noun = "React component" if is_component else "symbol"
+        prompt = f'Which {noun} in `{target_path}` is responsible for: "{clean_doc}"?'
+    elif is_component:
+        prompt = f"Which React component in `{target_path}` renders `{target.name}`?"
     else:
         prompt = (
             f"Which symbol in `{target_path}` defines the {target.kind} implementing "
@@ -185,27 +191,41 @@ def generate_locate_challenge_for_graph(graph: Any, repo_id: str) -> ChallengeDe
 
     start_line = target.range.start_line
     end_line = target.range.end_line
-    hint = f"Inspect `{target_path}` around lines {start_line}–{end_line}."
+    noun_title = f"React Component {target.name}" if is_component else target.name
     repo_name = getattr(graph.snapshot, "repository_name", repo_id) or repo_id
+    hint = f"Inspect `{target_path}` around lines {start_line}–{end_line}."
+
+    if is_component:
+        correct_feedback = (
+            f"Correct! The React component `{target.name}` in `{target_path}` "
+            f"(lines {start_line}–{end_line}) renders this element."
+        )
+        incorrect_feedback = (
+            f"Incorrect. '{{answer}}' is not the component at `{target_path}:{start_line}`. "
+            f"The correct component is `{target.name}`."
+        )
+    else:
+        correct_feedback = (
+            f"Correct! `{target.name}` in `{target_path}` (lines {start_line}–{end_line}) "
+            "implements this functionality."
+        )
+        incorrect_feedback = (
+            f"Incorrect. '{{answer}}' is not the symbol defined at `{target_path}:{start_line}`. "
+            f"The correct symbol is `{target.name}`."
+        )
 
     challenge = ChallengeDefinition(
         id=f"challenge-locate-{repo_id}",
         type="locate",
-        title=f"Locate {target.name} in {repo_name}",
+        title=f"Locate {noun_title} in {repo_name}",
         prompt=prompt,
         options=options,
         target_path=target_path,
         target_symbol=target.name,
         hint=hint,
         correct_answer=target.name,
-        correct_feedback=(
-            f"Correct! `{target.name}` in `{target_path}` (lines {start_line}–{end_line}) "
-            "implements this functionality."
-        ),
-        incorrect_feedback=(
-            f"Incorrect. '{{answer}}' is not the symbol defined at `{target_path}:{start_line}`. "
-            f"The correct symbol is `{target.name}`."
-        ),
+        correct_feedback=correct_feedback,
+        incorrect_feedback=incorrect_feedback,
         repo_id=repo_id,
     )
     DYNAMIC_CHALLENGES[challenge.id] = challenge

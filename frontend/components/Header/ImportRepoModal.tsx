@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   X,
   GitBranch,
@@ -9,8 +9,8 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { importGithubRepo, fetchGithubRepoInfo } from "../../lib/api";
-import { GithubImportResponse, GitHubRepoInfo } from "../../lib/types";
+import { importGithubRepo } from "../../lib/api";
+import { GithubImportResponse } from "../../lib/types";
 import styles from "./ImportRepoModal.module.css";
 
 interface ImportRepoModalProps {
@@ -37,55 +37,12 @@ export function ImportRepoModal({
   const [isLoading, setIsLoading] = useState(false);
   const [currentStageIndex, setCurrentStageIndex] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [repoInfo, setRepoInfo] = useState<GitHubRepoInfo | null>(null);
-  const [isLoadingInfo, setIsLoadingInfo] = useState(false);
 
   // Validate GitHub URL
   const isValidUrl =
     /^(https?:\/\/)?(www\.)?github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(\.git)?\/?$/.test(
       url.trim(),
     );
-
-  // Fetch trusted GitHub repository metadata before analysis
-  useEffect(() => {
-    if (!isOpen || !isValidUrl) {
-      return;
-    }
-
-    let isMounted = true;
-    const timer = setTimeout(async () => {
-      setIsLoadingInfo(true);
-      try {
-        const info = await fetchGithubRepoInfo(url.trim());
-        if (isMounted) {
-          setRepoInfo(info);
-        }
-      } catch {
-        if (isMounted) setRepoInfo(null);
-      } finally {
-        if (isMounted) setIsLoadingInfo(false);
-      }
-    }, 350);
-
-    return () => {
-      isMounted = false;
-      clearTimeout(timer);
-    };
-  }, [url, isValidUrl, isOpen]);
-
-  // Derived metadata preview only shown for valid URLs
-  const activeRepoInfo = isValidUrl ? repoInfo : null;
-  const activeIsLoadingInfo = isValidUrl ? isLoadingInfo : false;
-
-  const handleTryExample = (e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    setUrl("https://github.com/pallets/click");
-    setTouched(true);
-    setErrorMsg(null);
-  };
 
   if (!isOpen) return null;
 
@@ -118,36 +75,11 @@ export function ImportRepoModal({
     } catch (err) {
       clearInterval(stageInterval);
       setIsLoading(false);
-      let message =
+      setErrorMsg(
         err instanceof Error
           ? err.message
-          : "Failed to import repository. Please check URL and try again.";
-
-      // Safely extract message from serialized error JSON if present
-      if (typeof message === "string" && message.trim().startsWith("{")) {
-        try {
-          const parsed = JSON.parse(message);
-          if (parsed?.error?.message) {
-            message = parsed.error.message;
-          } else if (parsed?.message) {
-            message = parsed.message;
-          } else if (typeof parsed?.detail === "string") {
-            message = parsed.detail;
-          }
-        } catch {
-          // Keep message as is
-        }
-      }
-
-      if (
-        message.includes("Python source files") ||
-        message.includes("supported Python files")
-      ) {
-        message =
-          "This repository doesn't contain supported Python files. Unfog currently supports Python repositories.";
-      }
-
-      setErrorMsg(message);
+          : "Failed to import repository. Please check URL and try again.",
+      );
     }
   };
 
@@ -174,27 +106,14 @@ export function ImportRepoModal({
         {/* Modal Body */}
         <form onSubmit={handleSubmit} className={styles.body}>
           <p className={styles.description}>
-            Ingest and index any public GitHub Python repository. Unfog parses
-            the AST, extracts dependencies and functions, and creates a verified
-            codebase map without ever executing repository code.
+            Ingest and index any public GitHub repository (Python, TypeScript,
+            JavaScript, JSX, TSX). Unfog parses the AST, extracts React
+            components, functions, classes, and dependencies, and creates a
+            verified codebase map without ever executing repository code.
           </p>
 
           <div className={styles.formGroup}>
-            <div className={styles.labelRow}>
-              <label className={styles.label}>GitHub Repository URL</label>
-              <button
-                type="button"
-                className={styles.tryExampleBtn}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  handleTryExample(e);
-                }}
-                onClick={handleTryExample}
-                disabled={isLoading}
-              >
-                Try Example (pallets/click)
-              </button>
-            </div>
+            <label className={styles.label}>GitHub Repository URL</label>
             <div
               className={`${styles.inputWrapper} ${
                 touched && !isValidUrl ? styles.invalid : ""
@@ -218,75 +137,16 @@ export function ImportRepoModal({
             {touched && !isValidUrl && (
               <span className={styles.validationMsg}>
                 Must be a valid GitHub URL (e.g.
-                https://github.com/pallets/click)
+                https://github.com/pallets/click or
+                https://github.com/owner/repo)
               </span>
             )}
           </div>
 
-          {/* Trusted GitHub Metadata Preview before analysis */}
-          {activeIsLoadingInfo && (
-            <div className={styles.repoInfoLoading}>
-              <span className={styles.repoInfoSpinner} />
-              <span>Fetching repository metadata...</span>
-            </div>
-          )}
-          {!activeIsLoadingInfo && activeRepoInfo && (
-            <div className={styles.repoPreview}>
-              <div className={styles.repoPreviewHeader}>
-                <span className={styles.repoFullName}>
-                  {activeRepoInfo.full_name}
-                </span>
-                {activeRepoInfo.language ? (
-                  <span
-                    className={`${styles.languageBadge} ${
-                      activeRepoInfo.is_python
-                        ? styles.languageBadgePython
-                        : styles.languageBadgeOther
-                    }`}
-                  >
-                    {activeRepoInfo.language}
-                  </span>
-                ) : (
-                  <span
-                    className={`${styles.languageBadge} ${styles.languageBadgeOther}`}
-                  >
-                    Unknown
-                  </span>
-                )}
-              </div>
-              {activeRepoInfo.description && (
-                <p className={styles.repoDescription}>
-                  {activeRepoInfo.description}
-                </p>
-              )}
-              {!activeRepoInfo.is_python && activeRepoInfo.language && (
-                <div className={styles.languageNotice}>
-                  GitHub reports primary language as{" "}
-                  <strong>{activeRepoInfo.language}</strong>. Unfog currently
-                  supports Python repositories.
-                </div>
-              )}
-            </div>
-          )}
-
           {errorMsg && (
             <div className={styles.errorBanner}>
               <AlertCircle size={16} className={styles.errorIcon} />
-              <div className={styles.errorBody}>
-                <span className={styles.errorText}>{errorMsg}</span>
-                <button
-                  type="button"
-                  className={styles.errorTryExampleBtn}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    handleTryExample(e);
-                  }}
-                  onClick={handleTryExample}
-                  disabled={isLoading}
-                >
-                  Try Example Repository (pallets/click)
-                </button>
-              </div>
+              <span>{errorMsg}</span>
             </div>
           )}
 
@@ -333,8 +193,8 @@ export function ImportRepoModal({
               style={{ color: "var(--color-accent-teal)" }}
             />
             <span>
-              Zero-execution sandbox: Read-only AST analysis with tarball size
-              &amp; traversal limits.
+              Zero-execution sandbox: Read-only AST analysis (Python,
+              TypeScript, JavaScript, JSX, TSX) with strict size limits.
             </span>
           </div>
 

@@ -77,6 +77,7 @@ function CodebaseMapInner({
           name: file.path.split("/").pop() || file.path,
           kind: "file",
           path: file.path,
+          language: file.language,
           lineCount: file.line_count,
           symbolCount: fileSymbols.length,
           isHighlighted: highlightedPath === file.path,
@@ -97,6 +98,7 @@ function CodebaseMapInner({
             name: sym.name,
             kind: sym.kind,
             path: file.path,
+            language: sym.language || file.language,
             qualifiedName: sym.qualified_name || undefined,
             range: sym.range,
             docstring: sym.docstring || undefined,
@@ -132,6 +134,8 @@ function CodebaseMapInner({
         strokeColor = "var(--color-accent-amber)";
       } else if (edge.kind === "references") {
         strokeColor = "var(--color-accent-blue)";
+      } else if (edge.kind === "renders") {
+        strokeColor = "#5eead4";
       }
 
       edges.push({
@@ -162,7 +166,7 @@ function CodebaseMapInner({
           stroke: strokeColor,
           strokeWidth: 2,
         },
-        animated: edge.kind === "calls",
+        animated: edge.kind === "calls" || edge.kind === "renders",
       });
     });
 
@@ -170,23 +174,25 @@ function CodebaseMapInner({
   }, [graph, highlightedPath, selectedNodeId]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, , onEdgesChange] = useEdgesState(initialEdges);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  // Sync state when initialNodes change
+  // Sync state when initialNodes or initialEdges change (e.g. repo switch)
   useEffect(() => {
     setNodes(initialNodes);
-  }, [initialNodes, setNodes]);
+    setEdges(initialEdges);
+  }, [initialNodes, initialEdges, setNodes, setEdges]);
 
-  // Center and focus on selected node
+  // Center on node when selectedNodeId changes
   useEffect(() => {
     if (!selectedNodeId) return;
-    const targetNode = nodes.find(
-      (n) => (n.data as unknown as CodebaseNodeData)?.id === selectedNodeId,
-    );
-    if (targetNode && targetNode.position) {
-      setCenter(targetNode.position.x + 130, targetNode.position.y + 60, {
-        zoom: 1.05,
-        duration: 500,
+    const target = nodes.find((n) => {
+      const data = n.data as unknown as CodebaseNodeData;
+      return data.id === selectedNodeId;
+    });
+    if (target) {
+      setCenter(target.position.x + 140, target.position.y + 60, {
+        zoom: 0.9,
+        duration: 400,
       });
     }
   }, [selectedNodeId, nodes, setCenter]);
@@ -213,6 +219,7 @@ function CodebaseMapInner({
 
       const matchesKind =
         filterKind === "all" ||
+        (filterKind === "component" && data.kind === "component") ||
         (filterKind === "file" && data.kind === "file") ||
         (filterKind === "function" &&
           (data.kind === "function" || data.kind === "method")) ||
@@ -252,6 +259,15 @@ function CodebaseMapInner({
             onClick={() => setFilterKind("all")}
           >
             All
+          </button>
+          <button
+            type="button"
+            className={`${styles.filterBtn} ${
+              filterKind === "component" ? styles.active : ""
+            }`}
+            onClick={() => setFilterKind("component")}
+          >
+            Components
           </button>
           <button
             type="button"
@@ -317,6 +333,7 @@ function CodebaseMapInner({
         <MiniMap
           nodeColor={(node) => {
             const data = node.data as unknown as CodebaseNodeData;
+            if (data.kind === "component") return "#5eead4";
             if (data.kind === "file") return "var(--color-accent-teal)";
             if (data.kind === "class") return "var(--color-accent-amber)";
             return "var(--color-accent-violet)";
@@ -336,6 +353,10 @@ function CodebaseMapInner({
 
       {/* Top Semantic Legend */}
       <div className={styles.legendPanel}>
+        <div className={styles.legendItem}>
+          <span className={`${styles.legendDot} ${styles.comp}`} />
+          <span>Components</span>
+        </div>
         <div className={styles.legendItem}>
           <span className={`${styles.legendDot} ${styles.func}`} />
           <span>Functions</span>
