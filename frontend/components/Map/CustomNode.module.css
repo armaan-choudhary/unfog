@@ -260,6 +260,64 @@
   box-shadow: 0 8px 26px rgba(56, 189, 248, 0.25);
 }
 
+/* Expanded File Container for In-Map L3 Expansion */
+.fileExpandedContainer {
+  background-color: rgba(16, 22, 32, 0.88);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  border-radius: var(--radius-card);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  pointer-events: all;
+  backdrop-filter: blur(8px);
+  box-sizing: border-box;
+  transition: border-color 0.2s ease;
+}
+
+.fileExpandedContainer:hover {
+  border-color: rgba(56, 189, 248, 0.8);
+}
+
+.fileExpandedHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.95rem;
+  background-color: rgba(22, 30, 42, 0.92);
+  border-bottom: 1px solid rgba(56, 189, 248, 0.25);
+  border-top-left-radius: var(--radius-card);
+  border-top-right-radius: var(--radius-card);
+}
+
+.fileExpandedTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.collapseFileBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.55rem;
+  font-size: 0.725rem;
+  font-weight: 600;
+  border-radius: var(--radius-control);
+  background-color: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: #93c5fd;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.collapseFileBtn:hover {
+  background-color: rgba(56, 189, 248, 0.3);
+  border-color: #38bdf8;
+  color: #ffffff;
+}
+
 .groupIcon {
   color: #a78bfa;
   flex-shrink: 0;

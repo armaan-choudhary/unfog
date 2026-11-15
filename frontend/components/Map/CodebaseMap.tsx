@@ -31,7 +31,6 @@ import {
 } from "./CustomNode";
 import {
   extractL1Groups,
-  buildL3NodesAndEdges,
   buildUnifiedHierarchyNodesAndEdges,
   findHierarchyLocationForSymbol,
   findHierarchyLocationForPath,
@@ -65,8 +64,11 @@ function CodebaseMapInner({
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
 
-  // In-map group expansion state: tracks which groups are currently expanded on canvas
+  // In-map group and file expansion state: tracks which groups and files are expanded on canvas
   const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [expandedFileIds, setExpandedFileIds] = useState<Set<string>>(
     new Set(),
   );
 
@@ -92,6 +94,7 @@ function CodebaseMapInner({
     setSelectedGroupId(null);
     setSelectedFileId(null);
     setExpandedGroupIds(new Set());
+    setExpandedFileIds(new Set());
     setSearchQuery("");
   } else if (selectedNodeId && selectedNodeId !== prevSelectedNodeId) {
     setPrevSelectedNodeId(selectedNodeId);
@@ -100,6 +103,7 @@ function CodebaseMapInner({
       setSelectedGroupId(loc.groupId);
       setExpandedGroupIds((prev) => new Set([...prev, loc.groupId]));
       setSelectedFileId(loc.fileId);
+      setExpandedFileIds((prev) => new Set([...prev, loc.fileId]));
       setLevel("L3");
     }
   } else if (highlightedPath && highlightedPath !== prevHighlightedPath) {
@@ -109,6 +113,7 @@ function CodebaseMapInner({
       setSelectedGroupId(loc.groupId);
       setExpandedGroupIds((prev) => new Set([...prev, loc.groupId]));
       setSelectedFileId(loc.fileId);
+      setExpandedFileIds((prev) => new Set([...prev, loc.fileId]));
       setLevel("L3");
     }
   }
@@ -129,30 +134,61 @@ function CodebaseMapInner({
     });
   }, []);
 
+  // Toggle in-map file expansion (L3 symbols in the same map)
+  const handleToggleFile = useCallback(
+    (fileId: string) => {
+      setExpandedFileIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(fileId)) {
+          next.delete(fileId);
+          if (next.size === 0) {
+            setLevel(expandedGroupIds.size > 0 ? "L2" : "L1");
+          }
+        } else {
+          next.add(fileId);
+          setSelectedFileId(fileId);
+          // Ensure parent group is expanded in map
+          const fileObj = graph.files.find((f) => f.id === fileId);
+          if (fileObj) {
+            const loc = findHierarchyLocationForPath(
+              graph,
+              fileObj.path,
+              l1Groups,
+            );
+            if (loc) {
+              setSelectedGroupId(loc.groupId);
+              setExpandedGroupIds((gPrev) => new Set([...gPrev, loc.groupId]));
+            }
+          }
+          setLevel("L3");
+        }
+        return next;
+      });
+    },
+    [graph, l1Groups, expandedGroupIds],
+  );
+
   const handleExpandAll = useCallback(() => {
     setExpandedGroupIds(new Set(l1Groups.map((g) => g.id)));
-    setLevel("L2");
-  }, [l1Groups]);
+    setExpandedFileIds(new Set(graph.files.map((f) => f.id)));
+    setLevel("L3");
+  }, [l1Groups, graph.files]);
 
   const handleCollapseAll = useCallback(() => {
     setExpandedGroupIds(new Set());
+    setExpandedFileIds(new Set());
     setLevel("L1");
   }, []);
 
-  // Navigation callbacks
-  const handleDrillToL3 = useCallback((fileId: string) => {
-    setSelectedFileId(fileId);
-    setLevel("L3");
-  }, []);
-
   const handleGoBack = useCallback(() => {
-    if (level === "L3") {
+    if (expandedFileIds.size > 0 || level === "L3") {
+      setExpandedFileIds(new Set());
       setLevel("L2");
-    } else if (level === "L2") {
+    } else if (expandedGroupIds.size > 0 || level === "L2") {
       setExpandedGroupIds(new Set());
       setLevel("L1");
     }
-  }, [level]);
+  }, [expandedFileIds, expandedGroupIds, level]);
 
   // Active group and file helpers
   const activeGroup = useMemo(() => {
@@ -174,22 +210,15 @@ function CodebaseMapInner({
     );
   }, [graph.files, selectedFileId, activeGroup]);
 
-  // Generate nodes and edges for current view (groups expand within the same map)
+  // Generate nodes and edges where both L2 (files) and L3 (symbols) expand within the same map
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
-    if (level === "L3") {
-      // L3: Detailed intra-file symbols & call dependencies
-      const fid = activeFile ? activeFile.id : graph.files[0]?.id || "";
-      return buildL3NodesAndEdges(graph, fid, selectedNodeId, highlightedPath);
-    }
-
-    // In-map expandable explorer for L1 and L2:
-    // Expanded groups render their files in-place, while other groups remain on the same map
     return buildUnifiedHierarchyNodesAndEdges(
       graph,
       l1Groups,
       expandedGroupIds,
+      expandedFileIds,
       handleToggleGroup,
-      (fid) => handleDrillToL3(fid),
+      handleToggleFile,
       (symId) => {
         const sym = graph.symbols.find((s) => s.id === symId);
         if (sym) {
@@ -210,15 +239,14 @@ function CodebaseMapInner({
       highlightedPath,
     );
   }, [
-    level,
     graph,
     l1Groups,
     expandedGroupIds,
-    activeFile,
+    expandedFileIds,
     selectedNodeId,
     highlightedPath,
     handleToggleGroup,
-    handleDrillToL3,
+    handleToggleFile,
     onSelectNode,
   ]);
 
@@ -269,15 +297,15 @@ function CodebaseMapInner({
         // Toggle in-map expansion on group click
         handleToggleGroup(nodeData.id);
       } else if (nodeData.kind === "file") {
-        // Drill into file symbols
-        handleDrillToL3(nodeData.id);
+        // Toggle in-map file symbols expansion (L3)
+        handleToggleFile(nodeData.id);
         onSelectNode(nodeData);
       } else {
         // Select symbol and open Source Inspector
         onSelectNode(nodeData);
       }
     },
-    [handleToggleGroup, handleDrillToL3, onSelectNode],
+    [handleToggleGroup, handleToggleFile, onSelectNode],
   );
 
   // Filter nodes for search query and entity kinds
@@ -375,6 +403,7 @@ function CodebaseMapInner({
       setSelectedGroupId(item.groupId);
       setExpandedGroupIds((prev) => new Set([...prev, item.groupId]));
       setSelectedFileId(item.fileId);
+      setExpandedFileIds((prev) => new Set([...prev, item.fileId]));
       setLevel("L3");
       setSearchQuery("");
       setIsSearchFocused(false);
@@ -437,7 +466,10 @@ function CodebaseMapInner({
                 className={`${styles.breadcrumbBtn} ${
                   level === "L2" ? styles.breadcrumbActive : ""
                 }`}
-                onClick={() => setLevel("L2")}
+                onClick={() => {
+                  setExpandedFileIds(new Set());
+                  setLevel("L2");
+                }}
               >
                 <span>{activeGroup.name}</span>
               </button>
@@ -477,6 +509,7 @@ function CodebaseMapInner({
                 level === "L2" ? styles.levelPillActiveL2 : ""
               }`}
               onClick={() => {
+                setExpandedFileIds(new Set());
                 if (expandedGroupIds.size === 0 && l1Groups.length > 0) {
                   const targetGid = selectedGroupId || l1Groups[0].id;
                   setSelectedGroupId(targetGid);
@@ -494,12 +527,17 @@ function CodebaseMapInner({
                 level === "L3" ? styles.levelPillActiveL3 : ""
               }`}
               onClick={() => {
-                if (!selectedFileId && graph.files.length > 0) {
-                  setSelectedFileId(graph.files[0].id);
+                if (activeFile) {
+                  setExpandedFileIds(new Set([activeFile.id]));
+                  if (activeGroup) {
+                    setExpandedGroupIds(
+                      (prev) => new Set([...prev, activeGroup.id]),
+                    );
+                  }
+                  setLevel("L3");
                 }
-                setLevel("L3");
               }}
-              title="Level 3: Functions & Code"
+              title="Level 3: Functions & Code (In-Map Expanded Symbols)"
             >
               L3 Code
             </button>

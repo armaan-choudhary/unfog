@@ -203,11 +203,77 @@ export function GroupNode({ data, selected }: NodeProps) {
 }
 
 /**
- * L2 File Summary Node with interactive preview symbols.
+ * L2 File Summary Node (Supports both Collapsed and In-Map L3 Expanded states).
  */
 export function FileSummaryNode({ data, selected }: NodeProps) {
   const nodeData = data as unknown as CodebaseNodeData;
   const langLabel = getLanguageLabel(nodeData.path, nodeData.language);
+
+  // In-Map L3 Expanded State: forms bounding container around child symbol nodes
+  if (nodeData.isExpanded) {
+    return (
+      <div
+        className={`${styles.fileExpandedContainer} ${
+          selected ? styles.selected : ""
+        } ${nodeData.isHighlighted ? styles.highlighted : ""}`}
+        style={{ width: "100%", height: "100%" }}
+      >
+        <Handle
+          type="target"
+          position={Position.Top}
+          className={styles.handle}
+        />
+
+        <div className={styles.fileExpandedHeader}>
+          <div className={styles.headerLeft}>
+            <FileCode size={18} className={styles.fileIcon} />
+            <div className={styles.titleInfo}>
+              <div className={styles.titleRow}>
+                <span className={styles.fileExpandedTitle}>
+                  {nodeData.name}
+                </span>
+                <span className={`${styles.kindBadge} ${styles.kindFile}`}>
+                  L3 EXPANDED
+                </span>
+                {langLabel && (
+                  <span className={styles.langBadge}>{langLabel}</span>
+                )}
+                <span className={styles.rangeBadge}>
+                  {nodeData.lineCount} lines
+                </span>
+              </div>
+              <div className={styles.nodeSubtext}>{nodeData.path}</div>
+            </div>
+          </div>
+
+          <div className={styles.headerRight}>
+            <button
+              type="button"
+              className={styles.collapseFileBtn}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (nodeData.onToggleExpand) {
+                  nodeData.onToggleExpand();
+                } else if (nodeData.onExplore) {
+                  nodeData.onExplore();
+                }
+              }}
+              title="Collapse symbols back to module summary"
+            >
+              <ChevronUp size={14} />
+              <span>Collapse Symbols</span>
+            </button>
+          </div>
+        </div>
+
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          className={styles.handle}
+        />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -258,13 +324,17 @@ export function FileSummaryNode({ data, selected }: NodeProps) {
         </div>
       )}
 
-      {nodeData.onExplore && (
+      {(nodeData.onExplore || nodeData.onToggleExpand) && (
         <button
           type="button"
           className={`${styles.exploreBtn} ${styles.exploreBtnBlue}`}
           onClick={(e) => {
             e.stopPropagation();
-            nodeData.onExplore?.();
+            if (nodeData.onToggleExpand) {
+              nodeData.onToggleExpand();
+            } else if (nodeData.onExplore) {
+              nodeData.onExplore();
+            }
           }}
         >
           <span>Explore Symbols</span>

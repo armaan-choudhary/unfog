@@ -215,16 +215,18 @@ export function buildL1NodesAndEdges(
 }
 
 /**
- * Builds unified React Flow nodes and edges where groups expand within the same map.
- * When a group expands, it dynamically resizes into a container revealing its files
- * and internal dependencies, while other groups remain on the canvas with verified connections.
+ * Builds unified React Flow nodes and edges where groups and files expand within the same map.
+ * When a group expands (L2), it reveals its files in-place on the canvas.
+ * When a file expands (L3), it reveals its symbols and call graph in-place within the same map.
+ * All unexpanded groups and files remain on the canvas with accurately routed dependencies.
  */
 export function buildUnifiedHierarchyNodesAndEdges(
   graph: SourceGraph,
   groups: L1GroupSummary[],
   expandedGroupIds: Set<string>,
+  expandedFileIds: Set<string>,
   onToggleGroup: (groupId: string) => void,
-  onExploreFile?: (fileId: string) => void,
+  onToggleFile?: (fileId: string) => void,
   onSelectSymbol?: (symbolId: string) => void,
   selectedNodeId?: string,
   highlightedPath?: string,
@@ -253,29 +255,124 @@ export function buildUnifiedHierarchyNodesAndEdges(
     if (gid) symbolToGroup.set(sym.id, gid);
   });
 
-  // Calculate size for each group
+  // Calculate size for each group based on L2 and L3 expansion states
   const groupDimensions = new Map<
     string,
-    { width: number; height: number; files: SourceFile[] }
+    {
+      width: number;
+      height: number;
+      files: SourceFile[];
+      hasExpandedFile: boolean;
+      fileLayouts: Map<
+        string,
+        {
+          width: number;
+          height: number;
+          relX: number;
+          relY: number;
+          isExpanded: boolean;
+        }
+      >;
+    }
   >();
 
   groups.forEach((g) => {
-    const isExpanded = expandedGroupIds.has(g.id);
+    const isGroupExpanded = expandedGroupIds.has(g.id);
     const groupFiles = graph.files.filter((f) => g.fileIds.includes(f.id));
+    const hasExpandedFile = groupFiles.some((f) => expandedFileIds.has(f.id));
 
-    if (!isExpanded) {
+    if (!isGroupExpanded) {
       groupDimensions.set(g.id, {
         width: 340,
         height: 220,
         files: groupFiles,
+        hasExpandedFile: false,
+        fileLayouts: new Map(),
       });
-    } else {
+      return;
+    }
+
+    const fileLayouts = new Map<
+      string,
+      {
+        width: number;
+        height: number;
+        relX: number;
+        relY: number;
+        isExpanded: boolean;
+      }
+    >();
+
+    if (!hasExpandedFile) {
+      // Standard L2 grid: 2 columns of 320px file cards
       const fileCount = groupFiles.length;
       const numCols = fileCount <= 1 ? 1 : 2;
       const width = fileCount <= 1 ? 380 : 710;
+      const cardW = 320;
+      const cardH = 200;
+      const gapX = 25;
+      const gapY = 25;
+      const startX = 25;
+      const startY = 80;
+
+      groupFiles.forEach((f, fIdx) => {
+        const c = fIdx % numCols;
+        const r = Math.floor(fIdx / numCols);
+        fileLayouts.set(f.id, {
+          width: cardW,
+          height: cardH,
+          relX: startX + c * (cardW + gapX),
+          relY: startY + r * (cardH + gapY),
+          isExpanded: false,
+        });
+      });
+
       const rows = Math.max(1, Math.ceil(fileCount / numCols));
       const height = 85 + rows * 225 + 40;
-      groupDimensions.set(g.id, { width, height, files: groupFiles });
+      groupDimensions.set(g.id, {
+        width,
+        height,
+        files: groupFiles,
+        hasExpandedFile: false,
+        fileLayouts,
+      });
+    } else {
+      // L3 In-Map Expanded layout: vertical stack accommodating expanded files and symbols
+      const width = 720;
+      const fileW = 660;
+      const startX = 30;
+      let currentRelY = 85;
+
+      groupFiles.forEach((f) => {
+        const isFileExpanded = expandedFileIds.has(f.id);
+        let fileH = 175;
+
+        if (isFileExpanded) {
+          const syms = symbolsByFileId.get(f.id) || [];
+          const symCount = Math.max(1, syms.length);
+          const symRows = Math.ceil(symCount / 2);
+          fileH = 80 + symRows * 175 + 25;
+        }
+
+        fileLayouts.set(f.id, {
+          width: fileW,
+          height: fileH,
+          relX: startX,
+          relY: currentRelY,
+          isExpanded: isFileExpanded,
+        });
+
+        currentRelY += fileH + 25;
+      });
+
+      const height = currentRelY + 35;
+      groupDimensions.set(g.id, {
+        width,
+        height,
+        files: groupFiles,
+        hasExpandedFile: true,
+        fileLayouts,
+      });
     }
   });
 
@@ -286,7 +383,7 @@ export function buildUnifiedHierarchyNodesAndEdges(
 
   groups.forEach((g) => {
     const dim = groupDimensions.get(g.id)!;
-    const isExpanded = expandedGroupIds.has(g.id);
+    const isGroupExpanded = expandedGroupIds.has(g.id);
 
     // Pick column with smallest vertical accumulation
     const colIdx = colY[0] <= colY[1] ? 0 : 1;
@@ -294,8 +391,8 @@ export function buildUnifiedHierarchyNodesAndEdges(
     const gy = colY[colIdx];
     colY[colIdx] += dim.height + 60;
 
-    if (!isExpanded) {
-      // Collapsed group card
+    if (!isGroupExpanded) {
+      // Collapsed group card (L1)
       nodes.push({
         id: g.id,
         type: "groupNode",
@@ -314,7 +411,7 @@ export function buildUnifiedHierarchyNodesAndEdges(
         } satisfies CodebaseNodeData,
       });
     } else {
-      // Expanded Group Container
+      // Expanded Group Container (L2)
       nodes.push({
         id: g.id,
         type: "groupNode",
@@ -334,21 +431,9 @@ export function buildUnifiedHierarchyNodesAndEdges(
         } satisfies CodebaseNodeData,
       });
 
-      // Child file nodes inside expanded group
-      const numFileCols = dim.files.length <= 1 ? 1 : 2;
-      const cardW = 320;
-      const cardH = 200;
-      const gapX = 25;
-      const gapY = 25;
-      const startX = 25;
-      const startY = 80;
-
-      dim.files.forEach((file, fIdx) => {
-        const c = fIdx % numFileCols;
-        const r = Math.floor(fIdx / numFileCols);
-        const relX = startX + c * (cardW + gapX);
-        const relY = startY + r * (cardH + gapY);
-
+      // Child file nodes & symbol nodes inside this expanded group
+      dim.files.forEach((file) => {
+        const layout = dim.fileLayouts.get(file.id)!;
         const fileSymbols = symbolsByFileId.get(file.id) || [];
         const previewSymbols = fileSymbols.slice(0, 4).map((s) => ({
           id: s.id,
@@ -356,12 +441,16 @@ export function buildUnifiedHierarchyNodesAndEdges(
           kind: s.kind,
         }));
 
+        const isFileExpanded = layout.isExpanded;
+
+        // Emit File Node (either compact module card or expanded frame)
         nodes.push({
           id: `node-file-${file.id}`,
           type: "fileSummaryNode",
-          position: { x: relX, y: relY },
+          position: { x: layout.relX, y: layout.relY },
           parentId: g.id,
           extent: "parent",
+          style: { width: layout.width, height: layout.height },
           data: {
             id: file.id,
             name: file.path.split("/").pop() || file.path,
@@ -371,19 +460,109 @@ export function buildUnifiedHierarchyNodesAndEdges(
             lineCount: file.line_count,
             symbolCount: fileSymbols.length,
             previewSymbols,
+            isExpanded: isFileExpanded,
             selectedSymbolId: selectedNodeId,
             isHighlighted: highlightedPath === file.path,
-            onExplore: onExploreFile ? () => onExploreFile(file.id) : undefined,
+            onExplore: onToggleFile ? () => onToggleFile(file.id) : undefined,
+            onToggleExpand: onToggleFile
+              ? () => onToggleFile(file.id)
+              : undefined,
             onSelectSymbol: onSelectSymbol
               ? (symId) => onSelectSymbol(symId)
               : undefined,
           } satisfies CodebaseNodeData,
         });
+
+        // When file is expanded to L3: Emit child symbol nodes in the same map!
+        if (isFileExpanded) {
+          fileSymbols.forEach((sym, sIdx) => {
+            const symCol = sIdx % 2;
+            const symRow = Math.floor(sIdx / 2);
+            const symRelX = layout.relX + 15 + symCol * 315;
+            const symRelY = layout.relY + 75 + symRow * 175;
+
+            nodes.push({
+              id: `node-sym-${sym.id}`,
+              type: "symbolNode",
+              position: { x: symRelX, y: symRelY },
+              parentId: g.id,
+              extent: "parent",
+              style: { zIndex: 10 },
+              data: {
+                id: sym.id,
+                name: sym.name,
+                kind: sym.kind,
+                path: file.path,
+                language: sym.language || file.language,
+                qualifiedName: sym.qualified_name || undefined,
+                range: sym.range,
+                docstring: sym.docstring || undefined,
+                isHighlighted:
+                  highlightedPath === file.path || selectedNodeId === sym.id,
+              } satisfies CodebaseNodeData,
+            });
+          });
+        }
       });
     }
   });
 
-  // Calculate verified dependencies: inter-file within expanded groups & cross-group
+  // Calculate dependencies: intra-file symbol edges, inter-file edges, and cross-group edges
+  const symbolNodeSet = new Set<string>();
+  const fileNodeSet = new Set<string>();
+  const groupNodeSet = new Set<string>();
+
+  nodes.forEach((n) => {
+    if (n.id.startsWith("node-sym-")) symbolNodeSet.add(n.id);
+    else if (n.id.startsWith("node-file-")) fileNodeSet.add(n.id);
+    else groupNodeSet.add(n.id);
+  });
+
+  // 1. Intra-file symbol call/render/reference edges for L3 expanded files
+  graph.edges.forEach((edge) => {
+    const srcSymNodeId = `node-sym-${edge.source_symbol_id}`;
+    const tgtSymNodeId = `node-sym-${edge.target_symbol_id}`;
+
+    if (symbolNodeSet.has(srcSymNodeId) && symbolNodeSet.has(tgtSymNodeId)) {
+      let strokeColor = "var(--color-accent-violet)";
+      if (edge.kind === "extends") strokeColor = "var(--color-accent-amber)";
+      else if (edge.kind === "references")
+        strokeColor = "var(--color-accent-blue)";
+      else if (edge.kind === "renders") strokeColor = "#5eead4";
+
+      edges.push({
+        id: `intra-sym-${edge.source_symbol_id}->${edge.target_symbol_id}`,
+        source: srcSymNodeId,
+        target: tgtSymNodeId,
+        type: "bezier",
+        label: edge.kind,
+        labelStyle: {
+          fill: "var(--color-text-muted)",
+          fontSize: 9,
+          fontWeight: 600,
+        },
+        labelBgStyle: {
+          fill: "var(--color-panel)",
+          fillOpacity: 0.9,
+        },
+        labelBgPadding: [4, 2],
+        labelBgBorderRadius: 4,
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: strokeColor,
+          width: 12,
+          height: 12,
+        },
+        style: {
+          stroke: strokeColor,
+          strokeWidth: 2,
+        },
+        animated: true,
+      });
+    }
+  });
+
+  // 2. Inter-file and Cross-group aggregated edges
   const aggregatedEdges = new Map<
     string,
     {
@@ -403,53 +582,56 @@ export function buildUnifiedHierarchyNodesAndEdges(
 
     if (!srcGroupId || !tgtGroupId) return;
 
-    if (srcGroupId === tgtGroupId) {
-      // Intra-group dependency: only emit if this group is expanded
-      if (
-        expandedGroupIds.has(srcGroupId) &&
-        srcFileId &&
-        tgtFileId &&
-        srcFileId !== tgtFileId
-      ) {
-        const edgeKey = `intra-${srcFileId}->${tgtFileId}`;
-        const existing = aggregatedEdges.get(edgeKey) || {
-          source: `node-file-${srcFileId}`,
-          target: `node-file-${tgtFileId}`,
-          count: 0,
-          kinds: new Set<string>(),
-          isIntraGroup: true,
-        };
-        existing.count += 1;
-        existing.kinds.add(edge.kind);
-        aggregatedEdges.set(edgeKey, existing);
-      }
-    } else {
-      // Cross-group dependency
-      const srcExpanded = expandedGroupIds.has(srcGroupId);
-      const tgtExpanded = expandedGroupIds.has(tgtGroupId);
+    // Determine currently visible source endpoint
+    let srcEndpoint: string | null = null;
+    const srcSymId = `node-sym-${edge.source_symbol_id}`;
+    const srcFileNodeId = `node-file-${srcFileId}`;
 
-      const srcNodeId =
-        srcExpanded && srcFileId ? `node-file-${srcFileId}` : srcGroupId;
-      const tgtNodeId =
-        tgtExpanded && tgtFileId ? `node-file-${tgtFileId}` : tgtGroupId;
-
-      if (srcNodeId !== tgtNodeId) {
-        const edgeKey = `cross-${srcNodeId}->${tgtNodeId}`;
-        const existing = aggregatedEdges.get(edgeKey) || {
-          source: srcNodeId,
-          target: tgtNodeId,
-          count: 0,
-          kinds: new Set<string>(),
-          isIntraGroup: false,
-        };
-        existing.count += 1;
-        existing.kinds.add(edge.kind);
-        aggregatedEdges.set(edgeKey, existing);
-      }
+    if (symbolNodeSet.has(srcSymId)) {
+      srcEndpoint = srcSymId;
+    } else if (fileNodeSet.has(srcFileNodeId)) {
+      srcEndpoint = srcFileNodeId;
+    } else if (groupNodeSet.has(srcGroupId)) {
+      srcEndpoint = srcGroupId;
     }
+
+    // Determine currently visible target endpoint
+    let tgtEndpoint: string | null = null;
+    const tgtSymId = `node-sym-${edge.target_symbol_id}`;
+    const tgtFileNodeId = `node-file-${tgtFileId}`;
+
+    if (symbolNodeSet.has(tgtSymId)) {
+      tgtEndpoint = tgtSymId;
+    } else if (fileNodeSet.has(tgtFileNodeId)) {
+      tgtEndpoint = tgtFileNodeId;
+    } else if (groupNodeSet.has(tgtGroupId)) {
+      tgtEndpoint = tgtGroupId;
+    }
+
+    if (!srcEndpoint || !tgtEndpoint || srcEndpoint === tgtEndpoint) return;
+
+    // Avoid duplicate symbol-level edges already emitted above
+    if (
+      srcEndpoint.startsWith("node-sym-") &&
+      tgtEndpoint.startsWith("node-sym-")
+    ) {
+      return;
+    }
+
+    const edgeKey = `${srcEndpoint}->${tgtEndpoint}`;
+    const isIntra = srcGroupId === tgtGroupId;
+    const existing = aggregatedEdges.get(edgeKey) || {
+      source: srcEndpoint,
+      target: tgtEndpoint,
+      count: 0,
+      kinds: new Set<string>(),
+      isIntraGroup: isIntra,
+    };
+    existing.count += 1;
+    existing.kinds.add(edge.kind);
+    aggregatedEdges.set(edgeKey, existing);
   });
 
-  // Build edge objects with labels and styles
   aggregatedEdges.forEach((entry, key) => {
     const kindsStr = Array.from(entry.kinds).join(", ");
     const isIntra = entry.isIntraGroup;
