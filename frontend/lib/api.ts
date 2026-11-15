@@ -106,7 +106,8 @@ export async function importGithubRepo(
       );
     } else if (res.status === 422) {
       throw new Error(
-        "This repository doesn't contain supported Python files. Unfog currently supports Python repositories.",
+        errorDetail ||
+          "No supported source files found. Unfog supports Python, TypeScript, JavaScript, JSX, and TSX repositories.",
       );
     } else {
       throw new Error(
