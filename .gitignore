@@ -1,4 +1,6 @@
 # Local environment and secrets
+target/
+.unfog/
 .env
 .env.*
 !.env.example
