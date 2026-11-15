@@ -259,18 +259,28 @@ function CodebaseMapInner({
     setEdges(initialEdges);
   }, [initialNodes, initialEdges, setNodes, setEdges]);
 
-  // Auto-fit viewport whenever level or graph changes
+  // Auto-fit viewport smoothly whenever level, expanded groups/files, or selection changes
+  const expandedGroupKey = Array.from(expandedGroupIds).sort().join(",");
+  const expandedFileKey = Array.from(expandedFileIds).sort().join(",");
+
   useEffect(() => {
     const timer = setTimeout(() => {
       fitView({
         padding: 0.15,
-        minZoom: 0.6,
+        minZoom: 0.55,
         maxZoom: 0.85,
-        duration: 350,
+        duration: 400,
       });
-    }, 50);
+    }, 60);
     return () => clearTimeout(timer);
-  }, [level, selectedGroupId, selectedFileId, fitView]);
+  }, [
+    level,
+    selectedGroupId,
+    selectedFileId,
+    expandedGroupKey,
+    expandedFileKey,
+    fitView,
+  ]);
 
   // Center on symbol in L3 when selectedNodeId changes
   useEffect(() => {
