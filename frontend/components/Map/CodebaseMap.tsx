@@ -33,6 +33,35 @@ interface CodebaseMapProps {
   onSelectNode: (nodeData: CodebaseNodeData) => void;
 }
 
+function getFileTier(path: string): number {
+  const p = path.toLowerCase();
+  // Tier 1: Entrypoints / Root architecture / Main servers
+  if (
+    p.includes("app.") ||
+    p.includes("main.") ||
+    p.includes("index.") ||
+    p.includes("server.") ||
+    p.includes("layout.") ||
+    p.includes("page.") ||
+    p.includes("auth.")
+  ) {
+    return 1;
+  }
+  // Tier 2: Components / Domain Models / Views / Core Logic
+  if (
+    p.includes("component") ||
+    p.includes("order") ||
+    p.includes("model") ||
+    p.includes("view") ||
+    p.includes("route") ||
+    p.includes("pricing.")
+  ) {
+    return 2;
+  }
+  // Tier 3: Utilities / Database / Errors / Lib
+  return 3;
+}
+
 function CodebaseMapInner({
   graph,
   selectedNodeId,
@@ -43,7 +72,7 @@ function CodebaseMapInner({
   const [searchQuery, setSearchQuery] = useState("");
   const [filterKind, setFilterKind] = useState<string>("all");
 
-  // Compute graph nodes and layout
+  // Compute graph nodes and balanced 2D cluster layout
   const { initialNodes, initialEdges } = useMemo(() => {
     const nodes: Node[] = [];
     const edges: Edge[] = [];
@@ -56,13 +85,62 @@ function CodebaseMapInner({
       symbolsByFileId.set(sym.file_id, list);
     });
 
-    // Column layout: layout each file at an x offset
-    const columnSpacing = 360;
-    const rowSpacing = 180;
+    // 1. Sort files into logical architecture tiers
+    const sortedFiles = [...graph.files].sort((a, b) => {
+      const tierA = getFileTier(a.path);
+      const tierB = getFileTier(b.path);
+      if (tierA !== tierB) return tierA - tierB;
+      return a.path.localeCompare(b.path);
+    });
 
-    graph.files.forEach((file, fileIdx) => {
-      const colX = 60 + fileIdx * columnSpacing;
-      let curY = 60;
+    // 2. Dynamic 2D column count based on file count and aspect ratio ~1.2
+    const fileCount = sortedFiles.length;
+    let numCols: number;
+    if (fileCount <= 3) {
+      numCols = Math.max(1, fileCount);
+    } else if (fileCount <= 6) {
+      numCols = 3;
+    } else if (fileCount <= 12) {
+      numCols = 3;
+    } else if (fileCount <= 20) {
+      numCols = 4;
+    } else {
+      numCols = Math.max(4, Math.ceil(Math.sqrt(fileCount * 1.2)));
+    }
+
+    const clusterWidth = 320;
+    const colGap = 50;
+    const rowGap = 70;
+    const symbolRowSpacing = 160;
+    const fileHeaderSpacing = 160;
+
+    // 3. Pre-calculate cluster height for each file
+    const fileClusterHeights = sortedFiles.map((file) => {
+      const fileSymbols = symbolsByFileId.get(file.id) || [];
+      return fileHeaderSpacing + fileSymbols.length * symbolRowSpacing;
+    });
+
+    // 4. Compute maximum cluster height for each grid row
+    const rowMaxHeights: number[] = [];
+    sortedFiles.forEach((_, idx) => {
+      const rowIdx = Math.floor(idx / numCols);
+      const h = fileClusterHeights[idx];
+      rowMaxHeights[rowIdx] = Math.max(rowMaxHeights[rowIdx] || 0, h);
+    });
+
+    // 5. Compute Y start offsets for each grid row
+    const rowYStarts: number[] = [60];
+    for (let r = 0; r < rowMaxHeights.length - 1; r++) {
+      rowYStarts.push(rowYStarts[r] + rowMaxHeights[r] + rowGap);
+    }
+
+    // 6. Place file clusters in the 2D grid
+    sortedFiles.forEach((file, fileIdx) => {
+      const colIdx = fileIdx % numCols;
+      const rowIdx = Math.floor(fileIdx / numCols);
+
+      const colX = 60 + colIdx * (clusterWidth + colGap);
+      let curY = rowYStarts[rowIdx];
 
       // File Node
       const fileNodeId = `node-file-${file.id}`;
@@ -84,7 +162,7 @@ function CodebaseMapInner({
         } satisfies CodebaseNodeData,
       });
 
-      curY += rowSpacing;
+      curY += fileHeaderSpacing;
 
       // Symbol Nodes in this file
       fileSymbols.forEach((sym) => {
@@ -120,11 +198,11 @@ function CodebaseMapInner({
           },
         });
 
-        curY += rowSpacing;
+        curY += symbolRowSpacing;
       });
     });
 
-    // Map source edges (calls, references, extends)
+    // 7. Map source edges (calls, references, extends, renders)
     graph.edges.forEach((edge) => {
       const sourceNodeId = `node-sym-${edge.source_symbol_id}`;
       const targetNodeId = `node-sym-${edge.target_symbol_id}`;
@@ -191,7 +269,7 @@ function CodebaseMapInner({
     });
     if (target) {
       setCenter(target.position.x + 140, target.position.y + 60, {
-        zoom: 0.9,
+        zoom: 0.8,
         duration: 400,
       });
     }
@@ -308,7 +386,12 @@ function CodebaseMapInner({
         onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}
         fitView
-        fitViewOptions={{ padding: 0.25, includeHiddenNodes: false }}
+        fitViewOptions={{
+          padding: 0.15,
+          minZoom: 0.6,
+          maxZoom: 0.85,
+          includeHiddenNodes: false,
+        }}
         minZoom={0.2}
         maxZoom={2.0}
         proOptions={{ hideAttribution: true }}
