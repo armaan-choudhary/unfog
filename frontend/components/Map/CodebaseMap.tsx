@@ -31,9 +31,8 @@ import {
 } from "./CustomNode";
 import {
   extractL1Groups,
-  buildL1NodesAndEdges,
-  buildL2NodesAndEdges,
   buildL3NodesAndEdges,
+  buildUnifiedHierarchyNodesAndEdges,
   findHierarchyLocationForSymbol,
   findHierarchyLocationForPath,
 } from "../../lib/hierarchy";
@@ -66,6 +65,11 @@ function CodebaseMapInner({
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
 
+  // In-map group expansion state: tracks which groups are currently expanded on canvas
+  const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(
+    new Set(),
+  );
+
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState("");
   const [filterKind, setFilterKind] = useState<string>("all");
@@ -87,12 +91,14 @@ function CodebaseMapInner({
     setLevel("L1");
     setSelectedGroupId(null);
     setSelectedFileId(null);
+    setExpandedGroupIds(new Set());
     setSearchQuery("");
   } else if (selectedNodeId && selectedNodeId !== prevSelectedNodeId) {
     setPrevSelectedNodeId(selectedNodeId);
     const loc = findHierarchyLocationForSymbol(graph, selectedNodeId, l1Groups);
     if (loc) {
       setSelectedGroupId(loc.groupId);
+      setExpandedGroupIds((prev) => new Set([...prev, loc.groupId]));
       setSelectedFileId(loc.fileId);
       setLevel("L3");
     }
@@ -101,17 +107,39 @@ function CodebaseMapInner({
     const loc = findHierarchyLocationForPath(graph, highlightedPath, l1Groups);
     if (loc) {
       setSelectedGroupId(loc.groupId);
+      setExpandedGroupIds((prev) => new Set([...prev, loc.groupId]));
       setSelectedFileId(loc.fileId);
       setLevel("L3");
     }
   }
 
-  // Navigation callbacks
-  const handleDrillToL2 = useCallback((groupId: string) => {
-    setSelectedGroupId(groupId);
-    setLevel("L2");
+  // Toggle in-map group expansion
+  const handleToggleGroup = useCallback((groupId: string) => {
+    setExpandedGroupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+        if (next.size === 0) setLevel("L1");
+      } else {
+        next.add(groupId);
+        setSelectedGroupId(groupId);
+        setLevel("L2");
+      }
+      return next;
+    });
   }, []);
 
+  const handleExpandAll = useCallback(() => {
+    setExpandedGroupIds(new Set(l1Groups.map((g) => g.id)));
+    setLevel("L2");
+  }, [l1Groups]);
+
+  const handleCollapseAll = useCallback(() => {
+    setExpandedGroupIds(new Set());
+    setLevel("L1");
+  }, []);
+
+  // Navigation callbacks
   const handleDrillToL3 = useCallback((fileId: string) => {
     setSelectedFileId(fileId);
     setLevel("L3");
@@ -121,6 +149,7 @@ function CodebaseMapInner({
     if (level === "L3") {
       setLevel("L2");
     } else if (level === "L2") {
+      setExpandedGroupIds(new Set());
       setLevel("L1");
     }
   }, [level]);
@@ -145,36 +174,52 @@ function CodebaseMapInner({
     );
   }, [graph.files, selectedFileId, activeGroup]);
 
-  // Generate nodes and edges for current level
+  // Generate nodes and edges for current view (groups expand within the same map)
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
-    if (level === "L1") {
-      return buildL1NodesAndEdges(graph, l1Groups, (gid) => {
-        handleDrillToL2(gid);
-      });
+    if (level === "L3") {
+      // L3: Detailed intra-file symbols & call dependencies
+      const fid = activeFile ? activeFile.id : graph.files[0]?.id || "";
+      return buildL3NodesAndEdges(graph, fid, selectedNodeId, highlightedPath);
     }
 
-    if (level === "L2") {
-      const gid = activeGroup
-        ? activeGroup.id
-        : l1Groups[0]?.id || "group-root";
-      return buildL2NodesAndEdges(graph, gid, l1Groups, (fid) => {
-        handleDrillToL3(fid);
-      });
-    }
-
-    // L3: Functions and Code
-    const fid = activeFile ? activeFile.id : graph.files[0]?.id || "";
-    return buildL3NodesAndEdges(graph, fid, selectedNodeId, highlightedPath);
+    // In-map expandable explorer for L1 and L2:
+    // Expanded groups render their files in-place, while other groups remain on the same map
+    return buildUnifiedHierarchyNodesAndEdges(
+      graph,
+      l1Groups,
+      expandedGroupIds,
+      handleToggleGroup,
+      (fid) => handleDrillToL3(fid),
+      (symId) => {
+        const sym = graph.symbols.find((s) => s.id === symId);
+        if (sym) {
+          const file = graph.files.find((f) => f.id === sym.file_id);
+          onSelectNode({
+            id: sym.id,
+            name: sym.name,
+            kind: sym.kind,
+            path: file?.path || "",
+            language: sym.language || file?.language,
+            range: sym.range,
+            docstring: sym.docstring || undefined,
+            isHighlighted: true,
+          });
+        }
+      },
+      selectedNodeId,
+      highlightedPath,
+    );
   }, [
     level,
     graph,
     l1Groups,
-    activeGroup,
+    expandedGroupIds,
     activeFile,
     selectedNodeId,
     highlightedPath,
-    handleDrillToL2,
+    handleToggleGroup,
     handleDrillToL3,
+    onSelectNode,
   ]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -220,18 +265,19 @@ function CodebaseMapInner({
       const nodeData = node.data as unknown as CodebaseNodeData;
       if (!nodeData) return;
 
-      if (level === "L1") {
-        // Drill into L2 on click
-        handleDrillToL2(nodeData.id);
-      } else if (level === "L2") {
-        // Drill into L3 on click
+      if (nodeData.kind === "group") {
+        // Toggle in-map expansion on group click
+        handleToggleGroup(nodeData.id);
+      } else if (nodeData.kind === "file") {
+        // Drill into file symbols
         handleDrillToL3(nodeData.id);
-      } else if (level === "L3") {
+        onSelectNode(nodeData);
+      } else {
         // Select symbol and open Source Inspector
         onSelectNode(nodeData);
       }
     },
-    [level, handleDrillToL2, handleDrillToL3, onSelectNode],
+    [handleToggleGroup, handleDrillToL3, onSelectNode],
   );
 
   // Filter nodes for search query and entity kinds
@@ -327,6 +373,7 @@ function CodebaseMapInner({
   const handleSelectSearchResult = useCallback(
     (item: (typeof searchResults)[0]) => {
       setSelectedGroupId(item.groupId);
+      setExpandedGroupIds((prev) => new Set([...prev, item.groupId]));
       setSelectedFileId(item.fileId);
       setLevel("L3");
       setSearchQuery("");
@@ -375,7 +422,7 @@ function CodebaseMapInner({
             className={`${styles.breadcrumbBtn} ${
               level === "L1" ? styles.breadcrumbActive : ""
             }`}
-            onClick={() => setLevel("L1")}
+            onClick={handleCollapseAll}
           >
             <FolderTree size={14} />
             <span>Project</span>
@@ -419,8 +466,8 @@ function CodebaseMapInner({
               className={`${styles.levelPill} ${
                 level === "L1" ? styles.levelPillActive : ""
               }`}
-              onClick={() => setLevel("L1")}
-              title="Level 1: Project Architecture"
+              onClick={handleCollapseAll}
+              title="Level 1: Project Architecture (Collapse all groups)"
             >
               L1 Architecture
             </button>
@@ -430,12 +477,14 @@ function CodebaseMapInner({
                 level === "L2" ? styles.levelPillActiveL2 : ""
               }`}
               onClick={() => {
-                if (!selectedGroupId && l1Groups.length > 0) {
-                  setSelectedGroupId(l1Groups[0].id);
+                if (expandedGroupIds.size === 0 && l1Groups.length > 0) {
+                  const targetGid = selectedGroupId || l1Groups[0].id;
+                  setSelectedGroupId(targetGid);
+                  setExpandedGroupIds(new Set([targetGid]));
                 }
                 setLevel("L2");
               }}
-              title="Level 2: Modules & Files"
+              title="Level 2: Modules & Files (In-Map Expanded Groups)"
             >
               L2 Modules
             </button>
@@ -453,6 +502,33 @@ function CodebaseMapInner({
               title="Level 3: Functions & Code"
             >
               L3 Code
+            </button>
+          </div>
+
+          {/* In-Map Expansion Quick Toggles */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.35rem",
+              marginLeft: "auto",
+            }}
+          >
+            <button
+              type="button"
+              className={styles.expandToggleBtn}
+              onClick={handleExpandAll}
+              title="Expand all groups within the same map"
+            >
+              Expand All
+            </button>
+            <button
+              type="button"
+              className={styles.expandToggleBtn}
+              onClick={handleCollapseAll}
+              title="Collapse all groups back to architecture cards"
+            >
+              Collapse All
             </button>
           </div>
         </div>

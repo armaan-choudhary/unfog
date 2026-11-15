@@ -87,11 +87,14 @@ export function ImportRepoModal({
     setErrorMsg(null);
   };
 
+  const isUnsupported = activeRepoInfo?.is_supported === false;
+  const isSubmitDisabled = !isValidUrl || isLoading || isUnsupported;
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isValidUrl || isLoading) return;
+    if (isSubmitDisabled) return;
 
     setIsLoading(true);
     setErrorMsg(null);
@@ -149,9 +152,11 @@ export function ImportRepoModal({
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         {/* Modal Header */}
         <div className={styles.header}>
-          <div className={styles.titleGroup}>
-            <GitBranch className={styles.titleIcon} size={20} />
-            <h2 className={styles.title}>Import Public GitHub Repository</h2>
+          <div className={styles.headerTitle}>
+            <GitBranch className={styles.headerIcon} size={20} />
+            <h2 className={styles.headerHeading}>
+              Import Public GitHub Repository
+            </h2>
           </div>
           <button
             type="button"
@@ -298,9 +303,9 @@ export function ImportRepoModal({
                     key={stage}
                     className={`${styles.stageItem} ${
                       isComplete
-                        ? styles.complete
+                        ? styles.completed
                         : isCurrent
-                          ? styles.current
+                          ? styles.active
                           : styles.pending
                     }`}
                   >
@@ -310,9 +315,9 @@ export function ImportRepoModal({
                         className={styles.stageIconDone}
                       />
                     ) : isCurrent ? (
-                      <span className={styles.spinner} />
+                      <span className={styles.stageSpinner} />
                     ) : (
-                      <span className={styles.stageDot} />
+                      <span className={styles.stageCircle} />
                     )}
                     <span className={styles.stageLabel}>{stage}</span>
                   </div>
@@ -322,11 +327,8 @@ export function ImportRepoModal({
           )}
 
           {/* Sandbox & Security Trust Notice */}
-          <div className={styles.securityNotice}>
-            <ShieldCheck
-              size={14}
-              style={{ color: "var(--color-accent-teal)" }}
-            />
+          <div className={styles.securityNote}>
+            <ShieldCheck size={14} className={styles.securityNoteIcon} />
             <span>
               Zero-execution sandbox: Read-only AST analysis (Python,
               TypeScript, JavaScript, JSX, TSX) with strict size limits.
@@ -334,7 +336,7 @@ export function ImportRepoModal({
           </div>
 
           {/* Modal Actions */}
-          <div className={styles.actions}>
+          <div className={styles.footer}>
             <button
               type="button"
               className={styles.cancelBtn}
@@ -346,12 +348,17 @@ export function ImportRepoModal({
             <button
               type="submit"
               className={styles.submitBtn}
-              disabled={!isValidUrl || isLoading}
+              disabled={isSubmitDisabled}
             >
               {isLoading ? (
                 <>
-                  <span className={styles.spinner} />
+                  <span className={styles.stageSpinner} />
                   <span>Processing...</span>
+                </>
+              ) : isUnsupported ? (
+                <>
+                  <AlertCircle size={16} />
+                  <span>Unsupported Language</span>
                 </>
               ) : (
                 <>

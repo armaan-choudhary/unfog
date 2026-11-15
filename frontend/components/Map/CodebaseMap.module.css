@@ -138,6 +138,27 @@
   color: #5eead4;
 }
 
+.expandToggleBtn {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-control);
+  background: rgba(167, 139, 250, 0.12);
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  color: #c4b5fd;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.expandToggleBtn:hover {
+  background: rgba(167, 139, 250, 0.25);
+  color: #ffffff;
+  border-color: #a78bfa;
+}
+
 .searchResultsDropdown {
   position: absolute;
   top: 100%;

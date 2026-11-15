@@ -113,6 +113,133 @@
   box-shadow: 0 10px 30px rgba(167, 139, 250, 0.3);
 }
 
+/* Expanded Group Container for In-Map Expansion */
+.groupExpandedContainer {
+  background-color: rgba(18, 18, 24, 0.85);
+  border: 1px solid rgba(167, 139, 250, 0.5);
+  border-radius: var(--radius-card);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  pointer-events: all;
+  backdrop-filter: blur(8px);
+  box-sizing: border-box;
+  transition: border-color 0.2s ease;
+}
+
+.groupExpandedContainer:hover {
+  border-color: rgba(167, 139, 250, 0.8);
+}
+
+.groupExpandedHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background-color: rgba(26, 26, 36, 0.9);
+  border-bottom: 1px solid rgba(167, 139, 250, 0.25);
+  border-top-left-radius: var(--radius-card);
+  border-top-right-radius: var(--radius-card);
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.titleInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.groupExpandedTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.collapseBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.725rem;
+  font-weight: 600;
+  border-radius: var(--radius-control);
+  background-color: rgba(167, 139, 250, 0.15);
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  color: #c4b5fd;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.collapseBtn:hover {
+  background-color: rgba(167, 139, 250, 0.3);
+  border-color: #a78bfa;
+  color: #ffffff;
+}
+
+.groupExpandedFooter {
+  position: absolute;
+  bottom: 0.6rem;
+  left: 1rem;
+  right: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 0.4rem;
+  border-top: 1px solid rgba(167, 139, 250, 0.15);
+  font-size: 0.675rem;
+  pointer-events: none;
+}
+
+.symbolPillBtn {
+  font-size: 0.68rem;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.3rem;
+  background-color: var(--color-panel-raised);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.symbolPillBtn:hover {
+  border-color: var(--color-accent-violet);
+  color: #ffffff;
+  background-color: rgba(167, 139, 250, 0.15);
+}
+
+.symbolPillSelected {
+  border-color: #a78bfa !important;
+  background-color: rgba(167, 139, 250, 0.3) !important;
+  color: #ffffff !important;
+}
+
 .fileSummaryContainer {
   background-color: var(--color-panel);
   border: 1px solid var(--color-border);

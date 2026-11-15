@@ -10,6 +10,7 @@ import {
   Component,
   FolderTree,
   ArrowRight,
+  ChevronUp,
 } from "lucide-react";
 import { SymbolKind } from "../../lib/types";
 import styles from "./CustomNode.module.css";
@@ -27,9 +28,13 @@ export interface CodebaseNodeData extends Record<string, unknown> {
   fileCount?: number;
   docstring?: string;
   isHighlighted?: boolean;
+  isExpanded?: boolean;
+  selectedSymbolId?: string;
   previewFiles?: Array<{ name: string; path: string; language: string }>;
   previewSymbols?: Array<{ id: string; name: string; kind: SymbolKind }>;
   onExplore?: () => void;
+  onToggleExpand?: () => void;
+  onSelectSymbol?: (symbolId: string) => void;
 }
 
 function getLanguageLabel(path: string, lang?: string): string {
@@ -48,11 +53,83 @@ function getLanguageLabel(path: string, lang?: string): string {
 }
 
 /**
- * L1 Architecture Group Node.
+ * L1 Architecture Group Node (Supports both Collapsed and In-Map Expanded states).
  */
 export function GroupNode({ data, selected }: NodeProps) {
   const nodeData = data as unknown as CodebaseNodeData;
 
+  // In-Map Expanded State: forms bounding container around child file nodes
+  if (nodeData.isExpanded) {
+    return (
+      <div
+        className={`${styles.groupExpandedContainer} ${
+          selected ? styles.selected : ""
+        } ${nodeData.isHighlighted ? styles.highlighted : ""}`}
+        style={{ width: "100%", height: "100%" }}
+      >
+        <Handle
+          type="target"
+          position={Position.Top}
+          className={styles.handle}
+        />
+
+        <div className={styles.groupExpandedHeader}>
+          <div className={styles.headerLeft}>
+            <FolderTree size={20} className={styles.groupIcon} />
+            <div className={styles.titleInfo}>
+              <div className={styles.titleRow}>
+                <span className={styles.groupExpandedTitle}>
+                  {nodeData.name}
+                </span>
+                <span className={`${styles.kindBadge} ${styles.kindGroup}`}>
+                  EXPANDED
+                </span>
+                <span className={styles.langBadge}>
+                  {nodeData.fileCount} files
+                </span>
+              </div>
+              <div className={styles.nodeSubtext}>{nodeData.path}</div>
+            </div>
+          </div>
+
+          <div className={styles.headerRight}>
+            <button
+              type="button"
+              className={styles.collapseBtn}
+              onClick={(e) => {
+                e.stopPropagation();
+                nodeData.onToggleExpand?.();
+              }}
+              title="Collapse group back to summary card"
+            >
+              <ChevronUp size={14} />
+              <span>Collapse</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Space inside is populated by child file nodes positioned by React Flow */}
+
+        <div className={styles.groupExpandedFooter}>
+          <div className={styles.provenanceBadge}>
+            <ShieldCheck size={12} />
+            <span>static_verified</span>
+          </div>
+          <span className={styles.statsText}>
+            {nodeData.fileCount} files · {nodeData.symbolCount} symbols
+          </span>
+        </div>
+
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          className={styles.handle}
+        />
+      </div>
+    );
+  }
+
+  // Collapsed State: compact summary card
   return (
     <div
       className={`${styles.groupContainer} ${selected ? styles.selected : ""} ${
@@ -90,19 +167,21 @@ export function GroupNode({ data, selected }: NodeProps) {
         </div>
       )}
 
-      {nodeData.onExplore && (
-        <button
-          type="button"
-          className={styles.exploreBtn}
-          onClick={(e) => {
-            e.stopPropagation();
-            nodeData.onExplore?.();
-          }}
-        >
-          <span>Explore Group</span>
-          <ArrowRight size={13} />
-        </button>
-      )}
+      <button
+        type="button"
+        className={styles.exploreBtn}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (nodeData.onToggleExpand) {
+            nodeData.onToggleExpand();
+          } else if (nodeData.onExplore) {
+            nodeData.onExplore();
+          }
+        }}
+      >
+        <span>Explore Group</span>
+        <ArrowRight size={13} />
+      </button>
 
       <div className={styles.nodeFooter}>
         <div className={styles.provenanceBadge}>
@@ -124,7 +203,7 @@ export function GroupNode({ data, selected }: NodeProps) {
 }
 
 /**
- * L2 File Summary Node with preview symbols.
+ * L2 File Summary Node with interactive preview symbols.
  */
 export function FileSummaryNode({ data, selected }: NodeProps) {
   const nodeData = data as unknown as CodebaseNodeData;
@@ -157,11 +236,25 @@ export function FileSummaryNode({ data, selected }: NodeProps) {
 
       {nodeData.previewSymbols && nodeData.previewSymbols.length > 0 && (
         <div className={styles.previewGrid}>
-          {nodeData.previewSymbols.map((ps) => (
-            <span key={ps.id} className={styles.previewPill} title={ps.name}>
-              {ps.name}
-            </span>
-          ))}
+          {nodeData.previewSymbols.map((ps) => {
+            const isSelected = nodeData.selectedSymbolId === ps.id;
+            return (
+              <button
+                key={ps.id}
+                type="button"
+                className={`${styles.symbolPillBtn} ${
+                  isSelected ? styles.symbolPillSelected : ""
+                }`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  nodeData.onSelectSymbol?.(ps.id);
+                }}
+                title={`Select ${ps.name} (${ps.kind})`}
+              >
+                <span>{ps.name}</span>
+              </button>
+            );
+          })}
         </div>
       )}
 
