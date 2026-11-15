@@ -129,6 +129,7 @@ export interface ChatMessage {
   role: "user" | "model";
   content: string;
   citations?: CitationRef[];
+  model?: string;
 }
 
 export interface AiChatRequest {

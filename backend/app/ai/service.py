@@ -49,6 +49,7 @@ class AIService:
 
         if generated_text:
             explanation = generated_text
+            model_used = model
         else:
             explanation = get_deterministic_explanation(
                 path=request.path,
@@ -56,12 +57,13 @@ class AIService:
                 prompt=request.prompt,
                 context=ctx,
             )
+            model_used = "offline-fallback"
 
         return ExplainResponse(
             explanation=explanation,
             citations=[ctx.to_citation()],
             provenance="ai_inferred",
-            model=model,
+            model=model_used,
         )
 
     def chat(self, request: ChatRequest) -> ChatResponse:
@@ -91,17 +93,19 @@ class AIService:
 
         if generated_text:
             reply = generated_text
+            model_used = model
         else:
             reply = get_deterministic_chat_reply(
                 message=request.message,
                 active_path=request.active_path,
                 citations=contexts,
             )
+            model_used = "offline-fallback"
 
         return ChatResponse(
             reply=reply,
             citations=[c.to_citation() for c in contexts],
-            model=model,
+            model=model_used,
         )
 
 

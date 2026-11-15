@@ -174,7 +174,8 @@ export function LearningArenaTab({
 
         <div className={styles.optionsList}>
           {activeChallenge.options.map((opt) => (
-            <div
+            <button
+              type="button"
               key={opt}
               className={`${styles.optionItem} ${
                 selectedOption === opt ? styles.selected : ""
@@ -185,7 +186,7 @@ export function LearningArenaTab({
                 {selectedOption === opt && <div className={styles.innerDot} />}
               </div>
               <span>{opt}</span>
-            </div>
+            </button>
           ))}
         </div>
 

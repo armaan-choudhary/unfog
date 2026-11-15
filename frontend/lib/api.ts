@@ -136,7 +136,7 @@ export async function explainSymbol(
         },
       ],
       provenance: "static_verified",
-      model: "gemini-2.5-flash (offline fallback)",
+      model: "offline-fallback (client preview)",
     };
   }
 }
@@ -199,7 +199,7 @@ export async function sendAiChat(
     return {
       reply,
       citations,
-      model: "gemini-2.5-flash (offline fallback)",
+      model: "offline-fallback (client preview)",
     };
   }
 }

@@ -106,7 +106,7 @@ def test_ai_service_explain_offline_deterministic(monkeypatch: pytest.MonkeyPatc
     assert resp.citations[0].path == "service/auth.py"
     assert resp.citations[0].range.start_line >= 1
     assert resp.provenance == "ai_inferred"
-    assert resp.model
+    assert resp.model == "offline-fallback"
 
 
 def test_ai_service_chat_offline_deterministic(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -120,6 +120,7 @@ def test_ai_service_chat_offline_deterministic(monkeypatch: pytest.MonkeyPatch) 
     resp = service.chat(req)
 
     assert resp.reply
+    assert resp.model == "offline-fallback"
     assert "service/errors.py" in resp.reply or "error" in resp.reply.lower()
     assert len(resp.citations) >= 1
     assert any(c.path == "service/errors.py" for c in resp.citations)

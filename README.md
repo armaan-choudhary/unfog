@@ -98,7 +98,7 @@ Move beyond passive reading into active retention and mastery:
 ### Step 1: Clone and Configure Environment
 
 ```bash
-git clone https://github.com/your-org/unfog.git
+git clone https://github.com/armaan-choudhary/unfog.git
 cd unfog
 
 # Copy environment template
@@ -176,7 +176,7 @@ Sample output:
 ```text
 ==> 1. Verifying Backend Health & Readiness
   ✔ PASS: Liveness endpoint (/healthz) (HTTP 200 matched 'ok')
-  ✔ PASS: Readiness endpoint (/readyz) (HTTP 200 matched 'ok')
+  ✔ PASS: Readiness endpoint (/readyz) (HTTP 200 matched 'ready')
 
 ==> 2. Verifying Codebase & Source Graph API
   ✔ PASS: Source Graph (/api/v1/codebase/graph) (HTTP 200 matched 'sample_service')

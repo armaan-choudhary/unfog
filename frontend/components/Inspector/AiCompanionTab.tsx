@@ -35,6 +35,7 @@ export function AiCompanionTab({
   ]);
   const [inputVal, setInputVal] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [activeModel, setActiveModel] = useState<string>("gemini-2.5-flash");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom of messages
@@ -52,6 +53,7 @@ export function AiCompanionTab({
     explainSymbol(node.path, node.name, node.id, prompt)
       .then((res) => {
         if (!isCancelled) {
+          if (res.model) setActiveModel(res.model);
           setMessages((prev) => [
             ...prev,
             { role: "user", content: prompt },
@@ -59,6 +61,7 @@ export function AiCompanionTab({
               role: "model",
               content: res.explanation,
               citations: res.citations,
+              model: res.model,
             },
           ]);
         }
@@ -103,12 +106,14 @@ export function AiCompanionTab({
         history,
       );
 
+      if (res.model) setActiveModel(res.model);
       setMessages((prev) => [
         ...prev,
         {
           role: "model",
           content: res.reply,
           citations: res.citations,
+          model: res.model,
         },
       ]);
     } catch {
@@ -195,9 +200,23 @@ export function AiCompanionTab({
     <div className={styles.container}>
       {/* Header with Model info */}
       <div className={styles.aiHeader}>
-        <div className={styles.modelBadge}>
+        <div
+          className={styles.modelBadge}
+          style={
+            activeModel.includes("offline") || activeModel.includes("fallback")
+              ? {
+                  borderColor: "var(--color-accent-amber)",
+                  color: "var(--color-accent-amber)",
+                }
+              : undefined
+          }
+        >
           <Sparkles size={12} />
-          <span>Gemini 2.5 Flash</span>
+          <span>
+            {activeModel.includes("offline") || activeModel.includes("fallback")
+              ? "Deterministic Offline Engine"
+              : activeModel}
+          </span>
         </div>
         <div
           style={{
