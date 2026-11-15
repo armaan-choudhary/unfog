@@ -22,6 +22,12 @@
   factory, configuration, health/readiness, errors, and request logging.
 - [P1-02 persistence](tasks/P1-02-persistence-setup.md) — initial persistence
   implementation and verification status.
+- [P1-03 background workers](tasks/P1-03-background-workers.md) — Celery,
+  Redis, and persistent job processing.
+- [P1-04 repository ownership/authentication](tasks/P1-04-repository-ownership-auth.md)
+  — OIDC bearer identity and owner-scoped API reads.
+- [Agent handoff](AGENT_HANDOFF.md) — verified baseline and next checkpoint for
+  the incoming development agent.
 
 The kickoff copies remain under `../unfog_agent_pack/` as supplied source
 materials. For active implementation, use the canonical documents above and
