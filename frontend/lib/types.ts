@@ -171,6 +171,20 @@ export interface ChallengeEvaluationResponse {
   citations: CitationRef[];
 }
 
+export interface GitHubRepoInfo {
+  owner: string;
+  repo: string;
+  full_name: string;
+  description: string | null;
+  html_url: string;
+  default_branch: string;
+  visibility: string;
+  language: string | null;
+  is_python: boolean;
+  stars: number;
+  forks: number;
+}
+
 export interface GithubImportResponse {
   repo_id: string;
   owner: string;

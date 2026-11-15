@@ -59,6 +59,17 @@ def _post_json(app: Any, path: str, payload: dict[str, Any]) -> Response:
     return asyncio.run(run())
 
 
+def _get_json(app: Any, path: str) -> Response:
+    async def run() -> Response:
+        async with app.router.lifespan_context(app):
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://testserver"
+            ) as client:
+                return await client.get(path)
+
+    return asyncio.run(run())
+
+
 # ============================================================================
 # 1. URL Validation Tests
 # ============================================================================
@@ -587,4 +598,92 @@ class TestGitHubImportAPI:
             {"url": "https://github.com/owner/jsrepo"},
         )
         assert response.status_code == 422
-        assert "no supported python source files" in response.json()["error"]["message"].lower()
+        err_msg = response.json()["error"]["message"]
+        assert "no supported python source files" in err_msg.lower()
+        assert "this repository doesn't contain supported python files" in err_msg.lower()
+        assert "unfog currently supports python repositories" in err_msg.lower()
+
+    def test_get_repo_info_python_repo(self) -> None:
+        mock_client = MagicMock()
+        mock_client.get_repo_details.return_value = {
+            "name": "click",
+            "full_name": "pallets/click",
+            "description": "Composable command line interface toolkit",
+            "html_url": "https://github.com/pallets/click",
+            "default_branch": "main",
+            "language": "Python",
+            "stargazers_count": 15000,
+            "forks_count": 2500,
+        }
+
+        service = GitHubService(client=mock_client)
+        app = create_app(_settings())
+        app.dependency_overrides[get_github_service] = lambda: service
+
+        response = _get_json(app, "/api/v1/github/info?url=https://github.com/pallets/click")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["owner"] == "pallets"
+        assert data["repo"] == "click"
+        assert data["language"] == "Python"
+        assert data["is_python"] is True
+        assert data["stars"] == 15000
+
+    def test_get_repo_info_non_python_repo(self) -> None:
+        mock_client = MagicMock()
+        mock_client.get_repo_details.return_value = {
+            "name": "portfolio",
+            "full_name": "developer/portfolio",
+            "description": "Portfolio website in React/Vite",
+            "html_url": "https://github.com/developer/portfolio",
+            "default_branch": "main",
+            "language": "TypeScript",
+            "stargazers_count": 5,
+            "forks_count": 1,
+        }
+
+        service = GitHubService(client=mock_client)
+        app = create_app(_settings())
+        app.dependency_overrides[get_github_service] = lambda: service
+
+        response = _get_json(app, "/api/v1/github/info?url=https://github.com/developer/portfolio")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["owner"] == "developer"
+        assert data["repo"] == "portfolio"
+        assert data["language"] == "TypeScript"
+        assert data["is_python"] is False
+
+    def test_import_with_long_docstring_succeeds(self) -> None:
+        long_doc = '"""' + ("A" * 5000) + '"""\n'
+        sample_tarball = _make_tarball(
+            {
+                "owner-sample-repo-1234567/main.py": (
+                    f"def function_with_long_doc():\n    {long_doc}    return 42\n"
+                ),
+            }
+        )
+
+        mock_client = MagicMock()
+        mock_client.get_repo_details.return_value = {
+            "name": "sample-repo",
+            "full_name": "owner/sample-repo",
+            "default_branch": "main",
+            "language": "Python",
+        }
+        mock_client.get_commit_sha.return_value = "1234567890abcdef1234567890abcdef12345678"
+        mock_client.download_tarball.return_value = sample_tarball
+
+        service = GitHubService(client=mock_client)
+        app = create_app(_settings())
+        app.dependency_overrides[get_github_service] = lambda: service
+
+        response = _post_json(
+            app,
+            "/api/v1/github/import",
+            {"url": "https://github.com/owner/sample-repo"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["file_count"] == 1
+        assert data["metadata"]["language"] == "Python"

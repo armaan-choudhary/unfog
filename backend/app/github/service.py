@@ -7,7 +7,7 @@ from uuid import uuid4
 from app.codeintel.service import CodebaseService, get_codebase_service
 from app.github.archive import extract_tarball_safely
 from app.github.client import GitHubClient
-from app.github.schemas import GitHubImportResponse, RepositoryMetadata
+from app.github.schemas import GitHubImportResponse, GitHubRepoInfo, RepositoryMetadata
 from app.github.validator import validate_github_url
 
 
@@ -67,6 +67,7 @@ class GitHubService:
             html_url=repo_details.get("html_url") or f"https://github.com/{owner}/{repo}",
             default_branch=default_branch,
             visibility="public",
+            language=repo_details.get("language"),
             stars=repo_details.get("stargazers_count", 0),
             forks=repo_details.get("forks_count", 0),
             open_issues=repo_details.get("open_issues_count", 0),
@@ -81,6 +82,27 @@ class GitHubService:
             file_count=file_count,
             metadata=metadata,
             extracted_path=str(dest_dir),
+        )
+
+    def get_repository_info(self, url: str) -> GitHubRepoInfo:
+        """Fetch trusted repository metadata before importing or extracting."""
+        owner, repo = validate_github_url(url)
+        repo_details = self.client.get_repo_details(owner, repo)
+        lang = repo_details.get("language")
+        is_python = bool(lang and str(lang).strip().lower() == "python")
+
+        return GitHubRepoInfo(
+            owner=owner,
+            repo=repo,
+            full_name=repo_details.get("full_name") or f"{owner}/{repo}",
+            description=repo_details.get("description"),
+            html_url=repo_details.get("html_url") or f"https://github.com/{owner}/{repo}",
+            default_branch=repo_details.get("default_branch") or "main",
+            visibility="public",
+            language=lang,
+            is_python=is_python,
+            stars=repo_details.get("stargazers_count", 0),
+            forks=repo_details.get("forks_count", 0),
         )
 
 

@@ -28,9 +28,34 @@ class RepositoryMetadata(BaseModel):
     html_url: str = Field(description="GitHub repository web URL")
     default_branch: str = Field(description="Default branch name")
     visibility: str = Field(default="public", description="Repository visibility")
+    language: str | None = Field(
+        default=None, description="Primary repository language reported by GitHub"
+    )
     stars: int = Field(default=0, description="Stargazers count")
     forks: int = Field(default=0, description="Forks count")
     open_issues: int = Field(default=0, description="Open issues count")
+
+
+class GitHubRepoInfo(BaseModel):
+    """Metadata and language info for a GitHub repository before import."""
+
+    model_config = ConfigDict(frozen=True)
+
+    owner: str = Field(description="Repository owner or organization")
+    repo: str = Field(description="Repository name")
+    full_name: str = Field(description="Full repository name (owner/repo)")
+    description: str | None = Field(default=None, description="Repository description")
+    html_url: str = Field(description="GitHub repository web URL")
+    default_branch: str = Field(description="Default branch name")
+    visibility: str = Field(default="public", description="Repository visibility")
+    language: str | None = Field(
+        default=None, description="Primary repository language reported by GitHub"
+    )
+    is_python: bool = Field(
+        default=False, description="Whether primary repository language is Python"
+    )
+    stars: int = Field(default=0, description="Stargazers count")
+    forks: int = Field(default=0, description="Forks count")
 
 
 class GitHubImportResponse(BaseModel):

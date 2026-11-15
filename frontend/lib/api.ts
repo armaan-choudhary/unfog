@@ -6,6 +6,7 @@ import {
   LearningChallenge,
   ChallengeEvaluationResponse,
   GithubImportResponse,
+  GitHubRepoInfo,
 } from "./types";
 import {
   MOCK_SOURCE_GRAPH,
@@ -40,6 +41,27 @@ function updateStatus(status: ConnectionStatus) {
   }
 }
 
+export async function fetchGithubRepoInfo(
+  url: string,
+): Promise<GitHubRepoInfo | null> {
+  try {
+    const res = await fetch(
+      `${BASE_URL}/api/v1/github/info?url=${encodeURIComponent(url)}`,
+      {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      },
+    );
+    if (!res.ok) {
+      return null;
+    }
+    const data = await res.json();
+    return data as GitHubRepoInfo;
+  } catch {
+    return null;
+  }
+}
+
 export async function importGithubRepo(
   url: string,
 ): Promise<GithubImportResponse> {
@@ -57,7 +79,9 @@ export async function importGithubRepo(
     try {
       const errData = await res.json();
       errorDetail =
-        errData.detail || errData.message || JSON.stringify(errData);
+        errData?.error?.message ||
+        (typeof errData?.detail === "string" ? errData.detail : "") ||
+        (typeof errData?.message === "string" ? errData.message : "");
     } catch {
       errorDetail = res.statusText;
     }
@@ -82,7 +106,7 @@ export async function importGithubRepo(
       );
     } else if (res.status === 422) {
       throw new Error(
-        errorDetail || "No supported Python source files found in repository.",
+        "This repository doesn't contain supported Python files. Unfog currently supports Python repositories.",
       );
     } else {
       throw new Error(

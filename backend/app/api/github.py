@@ -6,10 +6,29 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
-from app.github.schemas import GitHubImportRequest, GitHubImportResponse
+from app.github.schemas import (
+    GitHubImportRequest,
+    GitHubImportResponse,
+    GitHubRepoInfo,
+)
 from app.github.service import GitHubService, get_github_service
 
 router = APIRouter(prefix="/api/v1/github", tags=["github"])
+
+
+@router.get(
+    "/info",
+    response_model=GitHubRepoInfo,
+    status_code=status.HTTP_200_OK,
+    summary="Get Public GitHub Repository Info",
+    description="Fetches trusted repository metadata and primary language before analysis.",
+)
+async def get_repository_info(
+    url: str,
+    service: Annotated[GitHubService, Depends(get_github_service)],
+) -> GitHubRepoInfo:
+    """Get metadata and primary language for a public GitHub repository."""
+    return service.get_repository_info(url)
 
 
 @router.post(

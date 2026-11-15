@@ -296,7 +296,11 @@ def extract_tarball_safely(
             if extracted_file_count == 0:
                 raise ApplicationError(
                     code=ErrorCode.INVALID_REQUEST,
-                    message="No supported Python source files found in repository.",
+                    message=(
+                        "No supported Python source files found in repository. "
+                        "This repository doesn't contain supported Python files. "
+                        "Unfog currently supports Python repositories."
+                    ),
                     status_code=422,
                 )
 

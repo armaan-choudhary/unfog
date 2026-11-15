@@ -154,6 +154,8 @@ def build_source_graph(
             safe_end = max(safe_start, min(raw_sym.end_line, max(1, parsed.line_count)))
             line_range = LineRange(start_line=safe_start, end_line=safe_end)
 
+            safe_docstring = raw_sym.docstring[:4096] if raw_sym.docstring else None
+
             sym_record = SourceSymbol(
                 id=symbol_id,
                 snapshot_id=active_snapshot_id,
@@ -162,7 +164,7 @@ def build_source_graph(
                 qualified_name=raw_sym.qualified_name,
                 kind=raw_sym.kind,
                 language="python",
-                docstring=raw_sym.docstring,
+                docstring=safe_docstring,
                 range=line_range,
             )
             symbol_records.append(sym_record)
