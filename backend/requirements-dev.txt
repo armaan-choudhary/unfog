@@ -4,3 +4,4 @@ mypy>=1.18,<2
 pytest>=8.3,<10
 ruff>=0.14,<1
 httpx2>=2,<3
+jsonschema>=4.20,<5

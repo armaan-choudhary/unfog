@@ -1,0 +1,273 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--space-4);
+  gap: var(--space-4);
+  overflow-y: auto;
+}
+
+.arenaHeader {
+  background-color: var(--color-panel-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.goalTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.goalDescription {
+  font-size: 0.775rem;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+.challengeSelector {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.challengeTab {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background-color: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: 0.35rem 0.65rem;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.challengeTab:hover {
+  background-color: var(--color-panel-raised);
+  color: var(--color-text);
+}
+
+.challengeTab.active {
+  background-color: var(--color-accent-violet-soft);
+  border-color: var(--color-accent-violet);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.typeBadge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+}
+
+.typeLocate {
+  background-color: rgba(118, 101, 202, 0.25);
+  color: #c5b8ff;
+}
+
+.typeTrace {
+  background-color: rgba(113, 194, 189, 0.25);
+  color: var(--color-accent-teal);
+}
+
+.typePredict {
+  background-color: rgba(201, 157, 55, 0.25);
+  color: var(--color-accent-amber);
+}
+
+.challengeCard {
+  background-color: var(--color-panel-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.challengeTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.promptText {
+  font-size: 0.85rem;
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+.optionsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.optionItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  padding: 0.55rem 0.75rem;
+  background-color: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 0.8rem;
+  color: var(--color-text);
+}
+
+.optionItem:hover {
+  background-color: var(--color-sidebar);
+  border-color: var(--color-accent-violet);
+}
+
+.optionItem.selected {
+  background-color: var(--color-accent-violet-soft);
+  border-color: var(--color-accent-violet);
+  box-shadow: 0 0 0 1px var(--color-accent-violet);
+}
+
+.radioCircle {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.optionItem.selected .radioCircle {
+  border-color: var(--color-accent-violet);
+  background-color: var(--color-accent-violet);
+}
+
+.innerDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #ffffff;
+}
+
+.hintToggle {
+  background: transparent;
+  border: none;
+  color: var(--color-accent-violet);
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+  margin-top: 0.25rem;
+  text-decoration: underline;
+}
+
+.hintBox {
+  background-color: rgba(118, 101, 202, 0.1);
+  border: 1px solid rgba(118, 101, 202, 0.3);
+  border-radius: var(--radius-control);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.775rem;
+  color: #dfdaf5;
+  line-height: 1.4;
+}
+
+.submitBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1rem;
+  background-color: var(--color-accent-violet);
+  border: none;
+  border-radius: var(--radius-control);
+  color: #ffffff;
+  font-size: 0.825rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-top: 0.5rem;
+}
+
+.submitBtn:hover:not(:disabled) {
+  background-color: #8878dc;
+  transform: translateY(-1px);
+}
+
+.submitBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.feedbackBanner {
+  border-radius: var(--radius-card);
+  padding: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  animation: fadeIn 0.25s ease;
+}
+
+.feedbackBanner.correct {
+  background-color: rgba(113, 194, 189, 0.15);
+  border: 1px solid var(--color-accent-teal);
+  color: var(--color-text);
+}
+
+.feedbackBanner.incorrect {
+  background-color: rgba(189, 125, 153, 0.15);
+  border: 1px solid var(--color-accent-rose);
+  color: var(--color-text);
+}
+
+.feedbackHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 0.875rem;
+}
+
+.feedbackHeader.correct {
+  color: var(--color-accent-teal);
+}
+
+.feedbackHeader.incorrect {
+  color: var(--color-accent-rose);
+}
+
+.citationsBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px dashed var(--color-border);
+}

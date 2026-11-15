@@ -13,10 +13,15 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.cors import CORSMiddleware
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from app.api.ai import router as ai_router
+from app.api.codeintel import router as codeintel_router
+from app.api.github import router as github_router
 from app.api.health import check_database
 from app.api.health import router as health_router
+from app.api.learning import router as learning_router
 from app.api.resources import router as resources_router
 from app.core.auth import OIDCBearerVerifier, create_oidc_verifier
 from app.core.config import Settings
@@ -185,8 +190,19 @@ def create_app(
     app.state.settings = application_settings
     app.state.oidc_verifier = oidc_verifier or create_oidc_verifier(application_settings)
     app.add_middleware(RequestCorrelationMiddleware, logger=app_logger)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.include_router(health_router)
     app.include_router(resources_router)
+    app.include_router(codeintel_router)
+    app.include_router(github_router)
+    app.include_router(ai_router)
+    app.include_router(learning_router)
     for router in routers:
         app.include_router(router)
 

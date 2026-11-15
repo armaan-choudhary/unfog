@@ -21,11 +21,13 @@ def check_database(engine: Engine, timeout_seconds: int = 3) -> None:
 
 
 @router.get("/health", include_in_schema=True)
+@router.get("/healthz", include_in_schema=True)
 async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
 @router.get("/ready", include_in_schema=True)
+@router.get("/readyz", include_in_schema=True)
 async def ready(request: Request) -> dict[str, str]:
     try:
         readiness_probe: Callable[[], None] = request.app.state.readiness_probe

@@ -1,0 +1,42 @@
+.citationBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  background-color: var(--color-accent-violet-soft);
+  border: 1px solid var(--color-accent-violet);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.citationBadge:hover {
+  background-color: var(--color-accent-violet);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.citationPath {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.citationRange {
+  color: var(--color-accent-teal);
+  font-weight: 500;
+}
+
+.citationBadge:hover .citationRange {
+  color: #ffffff;
+}
+
+.citationIcon {
+  width: 0.85rem;
+  height: 0.85rem;
+  opacity: 0.85;
+}

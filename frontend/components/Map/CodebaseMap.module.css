@@ -1,0 +1,322 @@
+.mapWrapper {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background-color: var(--color-canvas);
+  overflow: hidden;
+}
+
+.mapToolbar {
+  position: absolute;
+  top: var(--space-4);
+  left: var(--space-4);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: calc(100% - 320px);
+}
+
+.toolbarRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background-color: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 0.35rem 0.6rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.breadcrumbsBar {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background-color: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 0.35rem 0.75rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  font-size: 0.775rem;
+  white-space: nowrap;
+  overflow-x: auto;
+}
+
+.breadcrumbBtn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0.15rem 0.35rem;
+  border-radius: var(--radius-control);
+  font-weight: 500;
+  font-size: inherit;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.breadcrumbBtn:hover {
+  color: #ffffff;
+  background-color: var(--color-panel-raised);
+}
+
+.breadcrumbActive {
+  color: #ffffff;
+  font-weight: 600;
+  cursor: default;
+}
+
+.breadcrumbSep {
+  color: var(--color-border);
+  font-size: 0.7rem;
+  user-select: none;
+}
+
+.backBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background-color: var(--color-panel-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.backBtn:hover {
+  background-color: var(--color-accent-violet-soft);
+  border-color: var(--color-accent-violet);
+  color: #ffffff;
+}
+
+.levelIndicatorGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  border-left: 1px solid var(--color-border);
+  padding-left: var(--space-2);
+}
+
+.levelPill {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.45rem;
+  border-radius: var(--radius-control);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.levelPill:hover {
+  color: var(--color-text);
+  background-color: var(--color-panel-raised);
+}
+
+.levelPillActive {
+  background-color: rgba(167, 139, 250, 0.25);
+  border-color: #a78bfa;
+  color: #c4b5fd;
+}
+
+.levelPillActiveL2 {
+  background-color: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+  color: #93c5fd;
+}
+
+.levelPillActiveL3 {
+  background-color: rgba(94, 234, 212, 0.2);
+  border-color: #5eead4;
+  color: #5eead4;
+}
+
+.expandToggleBtn {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-control);
+  background: rgba(167, 139, 250, 0.12);
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  color: #c4b5fd;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.expandToggleBtn:hover {
+  background: rgba(167, 139, 250, 0.25);
+  color: #ffffff;
+  border-color: #a78bfa;
+}
+
+.searchResultsDropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 0.35rem;
+  width: 280px;
+  max-height: 260px;
+  overflow-y: auto;
+  background-color: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  padding: 0.25rem;
+}
+
+.searchResultItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-control);
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.1s ease;
+}
+
+.searchResultItem:hover {
+  background-color: var(--color-panel-raised);
+}
+
+.searchResultTitle {
+  font-weight: 600;
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.searchResultPath {
+  font-size: 0.675rem;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.searchContainer {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background-color: var(--color-panel-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: 0.25rem 0.5rem;
+}
+
+.searchIcon {
+  color: var(--color-text-muted);
+}
+
+.searchInput {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--color-text);
+  font-size: 0.8rem;
+  width: 140px;
+}
+
+.searchInput::placeholder {
+  color: var(--color-text-muted);
+}
+
+.filterGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-left: 1px solid var(--color-border);
+  padding-left: var(--space-2);
+}
+
+.filterBtn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filterBtn:hover {
+  color: var(--color-text);
+  background-color: var(--color-panel-raised);
+}
+
+.filterBtn.active {
+  background-color: var(--color-accent-violet-soft);
+  border-color: var(--color-accent-violet);
+  color: var(--color-text);
+}
+
+/* Non-obscuring top-right compact legend pill */
+.legendPanel {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  z-index: 10;
+  background-color: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 0.35rem 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  font-size: 0.725rem;
+  color: var(--color-text-muted);
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.legendDot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+}
+
+.legendDot.comp {
+  background-color: #5eead4;
+}
+
+.legendDot.func {
+  background-color: var(--color-accent-violet);
+}
+
+.legendDot.cls {
+  background-color: var(--color-accent-amber);
+}
+
+.legendDot.file {
+  background-color: var(--color-accent-teal);
+}
+
+.legendDot.edge {
+  background-color: var(--color-border);
+}
