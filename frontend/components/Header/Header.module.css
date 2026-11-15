@@ -1,0 +1,180 @@
+.header {
+  height: 3.75rem;
+  background-color: var(--color-sidebar);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-4);
+  gap: var(--space-4);
+  z-index: 20;
+  flex-shrink: 0;
+}
+
+.leftSection {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  text-decoration: none;
+}
+
+.logoMark {
+  width: 2rem;
+  height: 2rem;
+  background: linear-gradient(135deg, var(--color-accent-violet), #9f8cf0);
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(118, 101, 202, 0.4);
+}
+
+.brandText {
+  display: flex;
+  flex-direction: column;
+}
+
+.brandTitle {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+  line-height: 1.2;
+}
+
+.brandSubtitle {
+  font-size: 0.675rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.badgesGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.repoBadge {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  background-color: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  font-size: 0.775rem;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.repoIcon {
+  width: 0.875rem;
+  height: 0.875rem;
+  color: var(--color-accent-violet);
+}
+
+.snapshotBadge {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  background-color: rgba(113, 194, 189, 0.12);
+  border: 1px solid var(--color-accent-teal);
+  border-radius: var(--radius-control);
+  font-size: 0.775rem;
+  font-weight: 600;
+  color: var(--color-accent-teal);
+}
+
+.verifiedIcon {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.rightSection {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.statusIndicator {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.725rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-control);
+}
+
+.statusIndicator.connected {
+  color: var(--color-accent-teal);
+}
+
+.statusIndicator.offline {
+  color: var(--color-accent-amber);
+}
+
+.statusDot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+}
+
+.statusDot.connected {
+  background-color: var(--color-accent-teal);
+  box-shadow: 0 0 6px var(--color-accent-teal);
+}
+
+.statusDot.offline {
+  background-color: var(--color-accent-amber);
+  box-shadow: 0 0 6px var(--color-accent-amber);
+}
+
+.actionBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.7rem;
+  background-color: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.actionBtn:hover {
+  background-color: var(--color-panel-raised);
+  border-color: var(--color-accent-violet);
+}
+
+.statsGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  border-right: 1px solid var(--color-border);
+  padding-right: var(--space-3);
+}
+
+.statItem {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.statValue {
+  color: var(--color-text);
+  font-weight: 600;
+}

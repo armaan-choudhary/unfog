@@ -32,3 +32,4 @@ venv/
 # Local development data
 /dev/
 /Dev/
+unfog_agent_pack/
