@@ -1,10 +1,9 @@
 # Backend application and persistence
 
 The backend contains a FastAPI application factory and the initial SQLAlchemy
-models and Alembic migration for users, repositories, immutable snapshots, and
-indexing jobs. Repository import, authentication, business endpoints, and
-workers remain later-ticket work. Do not install or execute code from imported
-repositories.
+models and Alembic migrations for users, repositories, immutable snapshots, and
+indexing jobs. Repository import and analysis remain later-ticket work. Do not
+install or execute code from imported repositories.
 
 Create and activate a repository-local virtual environment, then install the
 dependencies from this directory:
@@ -48,6 +47,42 @@ in `../docs/contracts/api-responses.v1.schema.json`.
 The app factory disposes its SQLAlchemy engine during shutdown. Request logs are
 JSON and include request IDs and status metadata; access paths, queries, request
 bodies, source text, and exception details are omitted.
+
+## Authentication and repository ownership
+
+Protected repository reads require an OIDC JWT access token in the
+`Authorization: Bearer` header with the `repositories:read` scope. Configure
+`OIDC_ISSUER`, `OIDC_AUDIENCE`, and `OIDC_JWKS_URL`; the API verifies the
+signature against that JWKS, the configured asymmetric algorithm allowlist,
+issuer, audience, expiry, subject, and a verified email claim. JWKS requests
+have a bounded timeout. Production startup fails if OIDC configuration is
+missing, incomplete, or uses non-HTTPS issuer/JWKS URLs.
+
+Users are resolved by the immutable `(auth_issuer, auth_subject)` pair. Email is
+profile data only and is never used to find or link an account. Existing users
+and repository ownership are preserved by the migration, but existing users
+without an OIDC identity are not automatically linked; explicit account
+recovery/linking is not implemented. Because the current email column remains
+unique and required, an OIDC identity with a duplicate email is rejected
+without revealing the existing account.
+
+For local work only, set `UNFOG_DEV_AUTH_ENABLED=true`, provide a generated
+`UNFOG_DEV_AUTH_TOKEN` of at least 32 characters, and configure
+`UNFOG_DEV_AUTH_EMAIL` and optionally `UNFOG_DEV_AUTH_SUBJECT`. The flag is
+accepted only with `APP_ENV=development`; it cannot be enabled in production.
+The configured bearer secret maps to one local identity. `X-User-ID` and other
+identity headers are ignored.
+
+The initial protected endpoints are read-only:
+
+- `GET /repositories/{repository_id}`
+- `GET /repositories/{repository_id}/snapshots/{snapshot_id}`
+- `GET /repositories/{repository_id}/jobs/{job_id}`
+
+All use centralized owner-scoped queries. Missing and non-owned resources return
+the same `not_found` error envelope. Responses omit repository source URIs and
+raw job error messages. No repository creation, update, import, or analysis
+endpoint is included in this ticket.
 
 ## Background workers
 

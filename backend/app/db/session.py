@@ -1,5 +1,5 @@
 import os
-from collections.abc import Iterator
+from collections.abc import AsyncIterator
 from functools import lru_cache
 
 from sqlalchemy import create_engine
@@ -34,7 +34,7 @@ def get_session_factory(database_url: str | None = None) -> sessionmaker[Session
     return sessionmaker(bind=get_engine(database_url), autoflush=False, expire_on_commit=False)
 
 
-def get_db_session() -> Iterator[Session]:
+async def get_db_session() -> AsyncIterator[Session]:
     session = get_session_factory()()
     try:
         yield session

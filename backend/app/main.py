@@ -17,6 +17,8 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.api.health import check_database
 from app.api.health import router as health_router
+from app.api.resources import router as resources_router
+from app.core.auth import OIDCBearerVerifier, create_oidc_verifier
 from app.core.config import Settings
 from app.core.errors import (
     ApplicationError,
@@ -61,6 +63,7 @@ def _error_response(
     return JSONResponse(
         status_code=status_code,
         content=response.model_dump(mode="json", exclude_none=True),
+        headers={"WWW-Authenticate": "Bearer"} if status_code == 401 else None,
     )
 
 
@@ -157,6 +160,7 @@ def create_app(
     *,
     readiness_probe: Callable[[], None] | None = None,
     routers: Sequence[APIRouter] = (),
+    oidc_verifier: OIDCBearerVerifier | None = None,
 ) -> FastAPI:
     """Build an isolated FastAPI app, optionally with test-specific dependencies."""
     application_settings = settings or Settings.from_environment()
@@ -179,8 +183,10 @@ def create_app(
 
     app = FastAPI(title="Unfog API", version="1.0.0", lifespan=lifespan)
     app.state.settings = application_settings
+    app.state.oidc_verifier = oidc_verifier or create_oidc_verifier(application_settings)
     app.add_middleware(RequestCorrelationMiddleware, logger=app_logger)
     app.include_router(health_router)
+    app.include_router(resources_router)
     for router in routers:
         app.include_router(router)
 

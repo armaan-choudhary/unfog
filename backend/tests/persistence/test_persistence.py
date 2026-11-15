@@ -5,7 +5,7 @@ from pathlib import Path
 from uuid import UUID
 
 from alembic.config import Config
-from sqlalchemy import create_engine, event, inspect
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -129,6 +129,84 @@ class PersistenceTests(unittest.TestCase):
                     self.assertIn("alembic_version", table_names)
                 finally:
                     migration_engine.dispose()
+            finally:
+                if old_url is None:
+                    os.environ.pop("DATABASE_URL", None)
+                else:
+                    os.environ["DATABASE_URL"] = old_url
+
+    def test_identity_migration_preserves_existing_rows_and_enforces_immutable_pair(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database_path = Path(temp_dir) / "identity-migration.db"
+            database_url = f"sqlite+pysqlite:///{database_path}"
+            old_url = os.environ.get("DATABASE_URL")
+            os.environ["DATABASE_URL"] = database_url
+            config = Config(str(BACKEND / "alembic.ini"))
+            try:
+                command.upgrade(config, "0001_initial_persistence")
+                migration_engine = create_engine(database_url)
+                user_id = UUID("f6a0c33e-311e-4ea0-a82c-a16031fa0d85")
+                repository_id = UUID("0361a2c3-613c-4776-9df6-2c384c69cafa")
+                with migration_engine.begin() as connection:
+                    connection.execute(
+                        text("INSERT INTO users (id, email) VALUES (:id, :email)"),
+                        {"id": user_id.hex, "email": "legacy@example.test"},
+                    )
+                    connection.execute(
+                        text(
+                            "INSERT INTO repositories "
+                            "(id, owner_id, name, source_kind, privacy_mode) "
+                            "VALUES (:id, :owner_id, 'legacy', 'git', 'local_only')"
+                        ),
+                        {"id": repository_id.hex, "owner_id": user_id.hex},
+                    )
+
+                command.upgrade(config, "head")
+                with migration_engine.begin() as connection:
+                    connection.execute(
+                        text(
+                            "UPDATE users SET auth_issuer = 'https://issuer.example.test', "
+                            "auth_subject = 'immutable-subject' WHERE id = :id"
+                        ),
+                        {"id": user_id.hex},
+                    )
+                    with self.assertRaises(IntegrityError):
+                        connection.execute(
+                            text(
+                                "UPDATE users SET auth_subject = 'changed-subject' WHERE id = :id"
+                            ),
+                            {"id": user_id.hex},
+                        )
+                    with self.assertRaises(IntegrityError):
+                        connection.execute(
+                            text(
+                                "INSERT INTO users (id, email, auth_issuer) "
+                                "VALUES (:id, 'partial@example.test', 'https://issuer.example.test')"
+                            ),
+                            {"id": UUID("96e9af70-615e-4e55-9b1b-3d8c83179579").hex},
+                        )
+
+                command.downgrade(config, "0001_initial_persistence")
+                with migration_engine.connect() as connection:
+                    self.assertEqual(
+                        connection.execute(
+                            text("SELECT email FROM users WHERE id = :id"),
+                            {"id": user_id.hex},
+                        ).scalar_one(),
+                        "legacy@example.test",
+                    )
+                    self.assertEqual(
+                        connection.execute(
+                            text("SELECT owner_id FROM repositories WHERE id = :id"),
+                            {"id": repository_id.hex},
+                        ).scalar_one(),
+                        user_id.hex,
+                    )
+                    self.assertNotIn(
+                        "auth_issuer",
+                        {col["name"] for col in inspect(connection).get_columns("users")},
+                    )
+                migration_engine.dispose()
             finally:
                 if old_url is None:
                     os.environ.pop("DATABASE_URL", None)

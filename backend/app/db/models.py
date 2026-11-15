@@ -38,8 +38,18 @@ class CreatedAt:
 
 class User(UUIDPrimaryKey, CreatedAt, Base):
     __tablename__ = "users"
+    __table_args__ = (
+        UniqueConstraint("auth_issuer", "auth_subject", name="uq_users_auth_identity"),
+        CheckConstraint(
+            "(auth_issuer IS NULL AND auth_subject IS NULL) OR "
+            "(auth_issuer IS NOT NULL AND auth_subject IS NOT NULL)",
+            name="auth_identity_pair",
+        ),
+    )
 
     email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True)
+    auth_issuer: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    auth_subject: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
 
 class Repository(UUIDPrimaryKey, CreatedAt, Base):
@@ -184,3 +194,16 @@ def reject_snapshot_identity_change(
     state = inspect(target)
     if any(state.attrs[name].history.has_changes() for name in identity_fields):
         raise ValueError("Snapshot source identity is immutable; create a new snapshot instead")
+
+
+@event.listens_for(User, "before_update")
+def reject_user_auth_identity_change(
+    mapper: Mapper[User], connection: Connection, target: User
+) -> None:
+    """Once assigned, an OIDC identity pair is immutable."""
+    state = inspect(target)
+    identity_fields = ("auth_issuer", "auth_subject")
+    histories = [state.attrs[name].history for name in identity_fields]
+    previous_values = [history.deleted[0] if history.deleted else None for history in histories]
+    if any(previous_values) and any(history.has_changes() for history in histories):
+        raise ValueError("User authentication identity is immutable.")
