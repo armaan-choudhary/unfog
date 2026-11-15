@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:unfog:contract:source-graph:v1",
+  "title": "Unfog Source Graph v1",
+  "description": "One source graph and its evidence, scoped to a single immutable repository snapshot.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "snapshot", "files", "symbols", "citations", "edges"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "snapshot": { "$ref": "#/$defs/snapshot" },
+    "files": { "type": "array", "items": { "$ref": "#/$defs/sourceFile" } },
+    "symbols": { "type": "array", "items": { "$ref": "#/$defs/sourceSymbol" } },
+    "citations": { "type": "array", "items": { "$ref": "#/$defs/citation" } },
+    "edges": { "type": "array", "items": { "$ref": "#/$defs/sourceEdge" } }
+  },
+  "$defs": {
+    "uuidV4": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "snapshotId": { "$ref": "#/$defs/uuidV4" },
+    "repositoryId": { "$ref": "#/$defs/uuidV4" },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "lineRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_line", "end_line"],
+      "properties": {
+        "start_line": { "type": "integer", "minimum": 1 },
+        "end_line": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "repository_id", "revision", "manifest_hash"],
+      "properties": {
+        "id": { "$ref": "#/$defs/snapshotId" },
+        "repository_id": { "$ref": "#/$defs/repositoryId" },
+        "revision": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": { "enum": ["git_commit", "content_manifest"] },
+            "value": { "type": "string", "minLength": 1, "maxLength": 256 }
+          }
+        },
+        "manifest_hash": { "$ref": "#/$defs/contentHash" }
+      }
+    },
+    "sourceFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "snapshot_id", "path", "language", "content_hash", "line_count"],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuidV4" },
+        "snapshot_id": { "$ref": "#/$defs/snapshotId" },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))[^\\\\]+$"
+        },
+        "language": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "content_hash": { "$ref": "#/$defs/contentHash" },
+        "line_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "sourceSymbol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "snapshot_id", "file_id", "name", "kind", "language", "range"],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuidV4" },
+        "snapshot_id": { "$ref": "#/$defs/snapshotId" },
+        "file_id": { "$ref": "#/$defs/uuidV4" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "qualified_name": { "type": ["string", "null"], "maxLength": 1024 },
+        "kind": { "enum": ["function", "class", "method", "interface", "module", "variable", "property", "unknown"] },
+        "language": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "range": { "$ref": "#/$defs/lineRange" }
+      }
+    },
+    "citation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "snapshot_id", "file_id", "path", "range", "content_hash"],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuidV4" },
+        "snapshot_id": { "$ref": "#/$defs/snapshotId" },
+        "file_id": { "$ref": "#/$defs/uuidV4" },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))[^\\\\]+$"
+        },
+        "range": { "$ref": "#/$defs/lineRange" },
+        "content_hash": { "$ref": "#/$defs/contentHash" }
+      }
+    },
+    "sourceEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "snapshot_id", "source_symbol_id", "target_symbol_id", "kind", "provenance", "evidence_citation_ids"],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuidV4" },
+        "snapshot_id": { "$ref": "#/$defs/snapshotId" },
+        "source_symbol_id": { "$ref": "#/$defs/uuidV4" },
+        "target_symbol_id": { "$ref": "#/$defs/uuidV4" },
+        "kind": { "enum": ["import", "contains", "calls", "extends", "references", "renders", "data_flow"] },
+        "provenance": { "enum": ["static_verified", "runtime_verified", "ai_inferred", "unknown"] },
+        "evidence_citation_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/uuidV4" }
+        },
+        "analyzer": { "type": ["string", "null"], "maxLength": 128 },
+        "analyzer_version": { "type": ["string", "null"], "maxLength": 128 },
+        "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}

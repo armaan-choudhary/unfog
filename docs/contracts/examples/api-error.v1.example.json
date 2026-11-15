@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "error": {
+    "code": "evidence_unavailable",
+    "message": "The requested source evidence is not available in this snapshot.",
+    "request_id": "550e8400-e29b-41d4-a716-446655440008",
+    "retryable": false,
+    "issues": [
+      {
+        "code": "citation_not_found",
+        "path": "citation_id"
+      }
+    ]
+  }
+}

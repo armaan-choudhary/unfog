@@ -1,0 +1,91 @@
+{
+  "schema_version": "1.0",
+  "snapshot": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "repository_id": "550e8400-e29b-41d4-a716-446655440001",
+    "revision": {
+      "kind": "git_commit",
+      "value": "0000000000000000000000000000000000000000"
+    },
+    "manifest_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "files": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440002",
+      "snapshot_id": "550e8400-e29b-41d4-a716-446655440000",
+      "path": "src/example.ts",
+      "language": "typescript",
+      "content_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "line_count": 12
+    }
+  ],
+  "symbols": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440003",
+      "snapshot_id": "550e8400-e29b-41d4-a716-446655440000",
+      "file_id": "550e8400-e29b-41d4-a716-446655440002",
+      "name": "firstStep",
+      "qualified_name": "firstStep",
+      "kind": "function",
+      "language": "typescript",
+      "range": {
+        "start_line": 2,
+        "end_line": 5
+      }
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440004",
+      "snapshot_id": "550e8400-e29b-41d4-a716-446655440000",
+      "file_id": "550e8400-e29b-41d4-a716-446655440002",
+      "name": "secondStep",
+      "qualified_name": "secondStep",
+      "kind": "function",
+      "language": "typescript",
+      "range": {
+        "start_line": 8,
+        "end_line": 12
+      }
+    }
+  ],
+  "citations": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440005",
+      "snapshot_id": "550e8400-e29b-41d4-a716-446655440000",
+      "file_id": "550e8400-e29b-41d4-a716-446655440002",
+      "path": "src/example.ts",
+      "range": {
+        "start_line": 2,
+        "end_line": 5
+      },
+      "content_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440006",
+      "snapshot_id": "550e8400-e29b-41d4-a716-446655440000",
+      "file_id": "550e8400-e29b-41d4-a716-446655440002",
+      "path": "src/example.ts",
+      "range": {
+        "start_line": 8,
+        "end_line": 12
+      },
+      "content_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    }
+  ],
+  "edges": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440007",
+      "snapshot_id": "550e8400-e29b-41d4-a716-446655440000",
+      "source_symbol_id": "550e8400-e29b-41d4-a716-446655440003",
+      "target_symbol_id": "550e8400-e29b-41d4-a716-446655440004",
+      "kind": "references",
+      "provenance": "unknown",
+      "evidence_citation_ids": [
+        "550e8400-e29b-41d4-a716-446655440005",
+        "550e8400-e29b-41d4-a716-446655440006"
+      ],
+      "analyzer": null,
+      "analyzer_version": null,
+      "confidence": null
+    }
+  ]
+}

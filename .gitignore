@@ -1,7 +1,33 @@
-target/
-node_modules/
-.unfog/
+# Local environment and secrets
 .env
+.env.*
+!.env.example
+
+# JavaScript / Next.js
+node_modules/
+.next/
+out/
 dist/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
 *.tsbuildinfo
 
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+
+# Local development data
+/dev/
+/Dev/

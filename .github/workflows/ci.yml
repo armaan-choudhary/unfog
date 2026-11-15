@@ -1,0 +1,127 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend / lint, format, typecheck, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Lint frontend
+        working-directory: frontend
+        run: npm run lint
+      - name: Check frontend formatting
+        working-directory: frontend
+        run: npm run format:check
+      - name: Type-check frontend
+        working-directory: frontend
+        run: npm run typecheck
+      - name: Build frontend for production
+        working-directory: frontend
+        run: npm run build
+
+  backend-quality:
+    name: Backend / Python ${{ matrix.python-version }} quality and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.14"]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+      - name: Install backend and development dependencies
+        run: python -m pip install -r backend/requirements-dev.txt
+      - name: Lint backend
+        working-directory: backend
+        run: python -m ruff check .
+      - name: Check backend formatting
+        working-directory: backend
+        run: python -m ruff format --check .
+      - name: Type-check backend
+        working-directory: backend
+        run: python -m mypy app
+      - name: Run backend tests
+        working-directory: backend
+        run: python -m pytest
+
+  postgres-integration:
+    name: Backend / PostgreSQL 17 migrations and constraints
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: unfog_test
+          POSTGRES_USER: unfog_test
+          POSTGRES_PASSWORD: unfog_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U unfog_test -d unfog_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      UNFOG_TEST_POSTGRES_URL: postgresql+psycopg://unfog_test:unfog_test@localhost:5432/unfog_test
+      UNFOG_TEST_REDIS_URL: redis://localhost:6379/0
+      REDIS_URL: redis://localhost:6379/0
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+      - name: Install backend and development dependencies
+        run: python -m pip install -r backend/requirements-dev.txt
+      - name: Verify PostgreSQL readiness, migrations, and database constraints
+        working-directory: backend
+        run: python -m pytest -v
