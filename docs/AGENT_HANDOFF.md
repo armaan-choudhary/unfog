@@ -1,23 +1,27 @@
 # Unfog 2.0 — Agent Handoff
 
-**Verified baseline:** `master` at commit `7ad2909`  
+**Active Branch:** `feat/intelligent-exploration` (PR #7)  
+**Base:** `master` at commit `7ad2909` -> feature commit `7ecddf4`  
 **Date:** 2026-11-16  
-**Status:** Clean working tree, all checks passing locally & on GitHub Actions CI.
+**Status:** Clean working tree, all checks passing locally (222 backend tests, Next.js build, 25/25 E2E tests, 8/8 container layering tests), PR #7 submitted for human review. All background servers cleanly stopped.
 
 ---
 
 ## 1. Executive Summary
 
-Unfog 2.0 has achieved full end-to-end integration across the frontend, backend, code intelligence pipeline, Gemini AI companion, and interactive codebase map.
+Unfog 2.0 has completed the **Intelligent Code Exploration and Learning UX Upgrade**, connecting architecture exploration, AST code navigation, Gemini companion assistance, and goal-driven learning challenges into a single cohesive experience.
 
-Key accomplishments up to this checkpoint:
-- **Repository Consolidation**: All work merged into a single branch `master`. All experimental/stale branches pruned.
-- **In-Map Three-Level Hierarchy (L1 / L2 / L3)**: Pure canvas-based expansion where L1 architecture directory groups expand into containers revealing L2 files, and L2 files expand into containers revealing L3 symbols with call graph edges—all within the same map view.
-- **Buttery-Smooth Animations (Option 4)**: Added FLIP CSS transitions on React Flow node movements, instant dragging suppression (`.dragging { transition: none !important }`), card entrance animations, subtle glow pulse on expansion, edge dash routing, and smooth camera auto-framing (`fitView` with 400ms duration).
-- **Multi-Language AST Engine**: Zero-execution sandbox supporting Python, TypeScript, JavaScript, JSX, and TSX with exact safe path, line ranges, and SHA-256 content hashes.
-- **Live GitHub Repository Import**: Authentic progress pipeline, repo metadata pre-flight check, language support validation, and error recovery banner.
-- **AI Companion & Learning Arena**: Grounded code explanations, interactive challenges with deterministic AST grading, and zero-hallucination citation verification.
-- **CI & Test Automation**: 100% green on all verification suites (Playwright journey tests, UX tests, smoke tests, and GitHub Actions CI).
+Key accomplishments in this update:
+- **Dependency Blast Radius (P0)**: Live directional relationship highlighting (Inbound in Teal `#71c2bd`, Outbound in Violet `#7665ca`) across L1, L2, and L3 hierarchies. Unrelated nodes and edges smoothly dim to 20–25% opacity. HUD indicator provides clear relationship counts and instant `Clear Selection` / `Clear Filters` recovery.
+- **Context-Aware AI Companion (P0)**: Active context banner tracking active repository, immutable snapshot ID, safe path, and symbol coordinates. Contextual Gemini suggestion chips dynamically generated from symbol kinds and verified caller/callee relationships. Skeleton pulse loading states, code block copy actions, and strict cross-repository conversation isolation.
+- **Source Inspector Navigation (P1)**: In-file sticky symbol outline for instant AST navigation with smooth scrolling, Open in GitHub linking directly to immutable commit SHAs with line anchors, single-click source citation copying, and one-click `Find Callers` / `Find Dependencies` graph focus.
+- **Learning Arena Enhancements (P1)**: Architectural goal grouping (*Architecture & Entrypoints*, *Call Graph & Data Flow*, *Business Logic*), 2-stage progressive hints without losing current selections, collapsible reference code inspection drawer with AST coordinates, and attempt provenance tracking (`independent`, `hint_assisted`, `solution_revealed`).
+- **Map Z-Index Layering & Container Bug Fixes (P2)**:
+  - Resolved expanded container overlaps (`pricing.py`, `orders.py`) by establishing strict DOM stacking: Expanded groups (`z-index: 1–2`), Expanded files (`z-index: 3–4`), Connecting edges (`z-index: 15`), Collapsed cards (`z-index: 20–22`), Child symbols (`z-index: 25–30`), Edge labels (`z-index: 35`).
+  - Connecting edges now render **on top** of container backgrounds, eliminating cut-off edge paths.
+  - Disabled pointer-events on `.react-flow__edge-interaction` (invisible 20px hit-test halo) so container headers and child cards remain interactive.
+  - Prevented parent container selection/hovering from graying out its own child symbols.
+  - Maintained translucent rgba backgrounds (`rgba(16, 22, 32, 0.88)`) for expanded containers.
 
 ---
 
@@ -25,13 +29,11 @@ Key accomplishments up to this checkpoint:
 
 - **Frontend**: Next.js 16 (App Router, Turbopack), React 19, TypeScript, `@xyflow/react` (v12.12.1), Lucide React.
   - *Styling Constraint*: Native CSS, CSS Modules, shared CSS variables (`styles/tokens.css`). **No Tailwind, Bootstrap, or shadcn/ui**.
-- **Backend**: Python 3.11 & 3.14, FastAPI, Pydantic v2, SQLAlchemy 2 (async psycopg), Alembic, Tree-sitter (Python, TypeScript, JavaScript).
-- **Database & Persistence**: PostgreSQL 17 (test DB on `localhost:54330`), UUIDv4 primary keys generated by `uuid.uuid4()`.
+- **Backend**: Python 3.11 & 3.12 (managed via `mise`), FastAPI, Pydantic v2, SQLAlchemy 2 (async psycopg), Alembic, Tree-sitter (Python, TypeScript, JavaScript).
+- **Database & Persistence**: PostgreSQL 17 (disposable Docker container `unfog-postgres` on `localhost:54330`), UUIDv4 primary keys generated by `uuid.uuid4()`.
 - **AI Runtime**: Google Gemini API via official `google-genai` SDK with deterministic citation fallbacks when offline or unconfigured.
-- **Background Tasks & Daemons**:
-  - Frontend dev server running on `http://localhost:3000` (Next.js).
-  - Backend API server running on `http://127.0.0.1:8000` (Uvicorn).
-  - All swarm worker agents have been terminated (0 active subagents).
+- **Background Servers & Daemons**:
+  - **All servers cleanly stopped**: Port 3000 (Next.js) and Port 8000 (FastAPI) are free. Docker container `unfog-postgres` is stopped.
 
 ---
 
@@ -41,15 +43,15 @@ Key accomplishments up to this checkpoint:
 
 | File | Purpose & Highlights |
 |---|---|
-| `components/Map/CodebaseMap.tsx` | Main canvas controller; React Flow integration; auto-framing `fitView` camera; level indicator pills (L1, L2, L3); Expand All / Collapse All controls; global search dropdown; filter kind pills. |
-| `components/Map/CodebaseMap.module.css` | Canvas container styling, toolbar, search, legend, and `:global(.react-flow__node)` / `:global(.react-flow__edge-path)` FLIP transition rules. |
-| `components/Map/CustomNode.tsx` | Custom node renderers: `GroupNode` (L1 collapsed / expanded container), `FileSummaryNode` (L2 collapsed / L3 expanded container), `SymbolNode` (L3 code entities), and `FileNode`. |
-| `components/Map/CustomNode.module.css` | Dark-theme card aesthetics, `@keyframes cardAppear`, `@keyframes pillAppear`, `groupGlowPulse`, `fileGlowPulse`, button hover micro-interactions, handles. |
-| `lib/hierarchy.ts` | Pure layout algorithm: `buildUnifiedHierarchyNodesAndEdges` computes dynamic bounding boxes, grid coordinates, and cross-level edge routing for nested in-map expansion. |
-| `components/Header/ImportRepoModal.tsx` | Public GitHub repository modal with metadata pre-check (`GET /api/v1/github/info`), language badge, multi-stage progress ticker, and error recovery. |
-| `components/Inspector/SourceInspectorTab.tsx` | Code citation viewer with syntax highlighting and verified file coordinate ranges. |
-| `components/Inspector/AiCompanionTab.tsx` | Grounded chat interface with citations and explanation requests. |
-| `components/Inspector/LearningArenaTab.tsx` | Dynamic AST-backed code understanding challenges with interactive evaluation. |
+| `components/Map/CodebaseMap.tsx` | Main canvas controller; React Flow integration; blast radius state & HUD; `Ctrl+K` search focus & `Escape` clear shortcuts; level indicator pills (L1, L2, L3); Expand All / Collapse All controls. |
+| `components/Map/CodebaseMap.module.css` | Canvas styling, toolbar, search, legend, FLIP transitions, and explicit React Flow DOM z-index layering (`groupNode: 1–2`, `fileExpanded: 3–4`, `edges: 15`, `fileSummary: 20–22`, `symbols: 25–30`). |
+| `components/Map/CustomNode.tsx` | Custom node renderers: `GroupNode`, `FileSummaryNode`, `SymbolNode`, and `FileNode`; directional blast radius badges (`← INBOUND`, `→ OUTBOUND`), hover & selection handlers. |
+| `components/Map/CustomNode.module.css` | Dark-theme card aesthetics, translucent container backgrounds (`rgba(16, 22, 32, 0.88)`), pointer-events isolation, blast radius glow borders. |
+| `lib/hierarchy.ts` | Layout & blast radius algorithm: `calculateBlastRadius` computes verified directional relationships; `applyBlastRadiusToGraph` applies styling while preserving container descendants; `buildUnifiedHierarchyNodesAndEdges` handles nested layout geometry. |
+| `components/Inspector/AiCompanionTab.tsx` | Active Context Banner, prompt suggestion chips, skeleton pulse loading, markdown code block formatter with copy buttons, conversation reset. |
+| `components/Inspector/SourceInspectorTab.tsx` | In-file symbol outline jumper with smooth scrolling, Open in GitHub with immutable commit SHAs, Copy Citation action, Find Callers & Find Dependencies triggers. |
+| `components/Inspector/LearningArenaTab.tsx` | Architectural goal grouping filters, 2-stage progressive hints, collapsible reference code drawer, and attempt provenance tracking. |
+| `lib/types.ts` | Core TypeScript contracts: `AttemptProvenance`, `CodeExcerpt`, `SolutionExplanation`, `BlastRadiusState`, and `LearningChallengeGoal`. |
 
 ### Backend (`backend/`)
 
@@ -58,7 +60,8 @@ Key accomplishments up to this checkpoint:
 | `app/main.py` | FastAPI application factory, middleware, CORS, error handling. |
 | `app/api/codeintel.py` | Codebase graph (`/api/v1/codebase/graph`) and source file reading (`/api/v1/codebase/file`). |
 | `app/api/github.py` | GitHub repo import (`/api/v1/github/import`) and repo info (`/api/v1/github/info`). |
-| `app/api/ai.py` | Grounded code explanation and contextual chat endpoints. |
+| `app/api/ai.py` | Contextual prompt suggestions (`/api/v1/ai/context/suggestions`) and grounded chat explanation endpoints. |
+| `app/ai/context.py` | Context extraction and suggestion generation engine deriving prompts from AST symbol coordinates and verified caller/callee relations. |
 | `app/api/learning.py` | Challenge listing and challenge evaluation endpoints. |
 | `app/codeintel/parser.py` | Python AST parser and symbol extraction. |
 | `app/codeintel/js_parser.py` | Tree-sitter parser for TypeScript, JavaScript, JSX, and TSX. |
@@ -69,68 +72,88 @@ Key accomplishments up to this checkpoint:
 
 ## 4. Verification & Testing Playbook
 
-All checks must pass before opening PRs or committing:
+All verification suites pass cleanly:
 
-### Frontend Checks (run in `frontend/`)
+### Automated E2E & Stacking Suites (Playwright)
 ```bash
-npm run typecheck       # TypeScript compilation check
-npm run lint            # ESLint static analysis
-npm run format:check    # Prettier formatting verification
-npm run build           # Next.js production build check
-```
+# 1. Independent Container Layering & Z-Index Suite (8 checks)
+node scripts/verify_container_layering.js
 
-### Backend Checks (run in repository root or `backend/`)
-```bash
-cd backend && python3 -m ruff check .
-cd backend && python3 -m ruff format --check .
-cd backend && python3 -m mypy app
-cd backend && python3 -m pytest
-```
+# 2. Intelligent Exploration Acceptance Suite (25 checks)
+node scripts/verify_intelligent_exploration.js
 
-### End-to-End & Playwright Suites (run from repo root)
-```bash
-# 1. Three-Level Hierarchy Acceptance Suite (21 scenarios)
+# 3. Hierarchy Journey Acceptance Suite (Scenarios 1-8)
 node scripts/verify_hierarchy_journey.js
+```
 
-# 2. Public GitHub Import & UX Suite (13 scenarios)
-node scripts/verify_import_ux.js
+### Frontend Code Quality Gates (`frontend/`)
+```bash
+npm run typecheck       # TypeScript compilation check (0 errors)
+npm run lint            # ESLint static analysis (0 warnings/errors)
+npm run format:check    # Prettier formatting verification (all match)
+npm run build           # Next.js Turbopack production build (compiled successfully)
+```
 
-# 3. Full System Smoke Test Suite (9 checks)
-bash scripts/smoke_test.sh
+### Backend Quality Gates (`backend/`)
+```bash
+cd backend && mise exec -- python -m ruff check .          # 0 issues
+cd backend && mise exec -- python -m ruff format --check . # 78 files checked
+cd backend && mise exec -- python -m mypy app              # 0 issues in 47 files
+cd backend && mise exec -- python -m pytest                # 222 passed in 1.54s
 ```
 
 ---
 
-## 5. What Was Done in the Latest Session (2026-11-15 - 2026-11-16)
+## 5. What Was Done in the Latest Session (2026-11-16)
 
-1. **Branch Consolidation**:
-   - Cleaned up fragmented branch state: PR #5 and PR #6 merged into `master`.
-   - Pruned all 6 obsolete local and remote branches.
-   - Pushed clean unified baseline to `origin/master`.
-2. **Killed Swarm Workers**:
-   - Terminated all 7 swarm workers (`codeintel`, `frontend`, `github`, `hierarchy`, `learning`, `monitor`, `verifier`) to prevent CPU/memory churn.
-3. **Smooth Map Animations & Layout Transitions (Option 4)**:
-   - Added FLIP node transitions (`transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)`).
-   - Enforced immediate dragging responsiveness via `:global(.react-flow__node.dragging) { transition: none !important; }`.
-   - Added `@keyframes cardAppear` on inner node cards and `@keyframes pillAppear` on symbol pills.
-   - Added smooth pulse glows on container expansion (`groupGlowPulse` and `fileGlowPulse`).
-   - Added hover micro-interactions to buttons and handles.
-   - Added animated dashed edge paths (`@keyframes edgeDash`) and edge hover dropshadow.
-   - Enhanced `fitView` camera auto-framing with a 400ms gliding duration on expand/collapse events.
-4. **Verified CI**:
-   - GitHub Actions Run [43748956044](https://github.com/armaan-choudhary/unfog/actions/runs/43748956044) passed on all 4 matrix jobs.
+1. **Dependency Blast Radius (P0)**:
+   - Implemented bidirectional AST relationship tracing in `hierarchy.ts`.
+   - Distinct Inbound (Teal `#71c2bd`) and Outbound (Violet `#7665ca`) color coding.
+   - Non-destructive 20–25% dimming of unrelated nodes/edges with smooth CSS transitions.
+   - HUD banner at bottom left showing active selection, relationship counts, and clear filters action.
+2. **Context-Aware AI Companion (P0)**:
+   - Added Active Context Banner displaying repo, snapshot, path, and symbol coordinates.
+   - Dynamic Gemini suggestion chips generated from AST properties via `GET /api/v1/ai/context/suggestions`.
+   - Skeleton pulse loading state while waiting for AI responses.
+   - Code block syntax styling with language badges and one-click copy buttons.
+   - Full conversation isolation on repository switch.
+3. **Source Inspector Navigation (P1)**:
+   - In-file symbol outline dropdown and jump list with smooth scrolling to symbol definitions.
+   - "Open in GitHub" links targeting immutable commit SHAs with exact line anchors (`#Lstart-Lend`).
+   - "Copy Citation" button copying standard citation format to clipboard.
+   - "Find Callers" and "Find Dependencies" actions triggering immediate blast radius focus on the map.
+4. **Learning Arena Enhancements (P1)**:
+   - Architectural goal grouping filters (*Architecture & Entrypoints*, *Call Graph & Data Flow*, *Business Logic*).
+   - 2-stage progressive hint revelation without losing current selection.
+   - Collapsible inline reference code inspection drawer.
+   - Attempt provenance tracking (`independent`, `hint_assisted`, `solution_revealed`).
+5. **Container Overlap & Edge Z-Index Fixes (P2)**:
+   - Fixed container z-index hierarchy so expanded containers (`pricing.py`, `orders.py`) stay behind connecting edges (containers at `z-index: 3–4`, edges at `z-index: 15`).
+   - Disabled pointer events on `.react-flow__edge-interaction` to prevent edge hitboxes from blocking container headers and child symbol cards.
+   - Prevented parent container selection/hovering from graying out its own child symbols.
+   - Maintained translucent rgba backgrounds (`rgba(16, 22, 32, 0.88)`).
+6. **PR Delivery**:
+   - Pushed branch to `origin/feat/intelligent-exploration`.
+   - Opened [PR #7: feat: Intelligent Code Exploration and Learning UX Upgrade](https://github.com/armaan-choudhary/unfog/pull/7).
+7. **Clean Server Shutdown**:
+   - Terminated Next.js frontend dev server (port 3000 freed).
+   - Terminated FastAPI backend uvicorn server (port 8000 freed).
+   - Stopped `unfog-postgres` PostgreSQL 17 docker container.
 
 ---
 
-## 6. Priorities for Tomorrow
+## 6. Priorities for Next Steps
 
-When resuming work tomorrow, consider focusing on these high-impact roadmap items:
+When resuming work, consider focusing on:
 
-1. **Dependency Blast Radius / Path Highlighting (Option 1 from Improvements Table)**:
-   - When hovering or clicking any node (group, file, or symbol), highlight upstream callers (inbound) in teal and downstream dependencies (outbound) in violet while dimming unrelated nodes.
-2. **Minimap & Navigation Enhancements (Option 2)**:
-   - Add interactive viewport panning on the mini-map, jump-to-group navigation buttons, and zoom-to-fit shortcuts (`Ctrl+0`).
-3. **Dynamic Grouping Modes (Option 3)**:
+1. **Human Review & Merge of PR #7**:
+   - Review [PR #7](https://github.com/armaan-choudhary/unfog/pull/7) on GitHub.
+   - Validate that automated CI runs green on GitHub Actions matrix.
+   - Merge PR #7 into `master`.
+2. **Minimap & Navigation Enhancements**:
+   - Add interactive viewport panning on the mini-map.
+   - Add quick jump-to-group navigation buttons and zoom-to-fit shortcuts (`Ctrl+0`).
+3. **Dynamic Grouping Modes**:
    - Allow toggling grouping between directory-based (default), architectural layer-based (API / Services / Core / UI), and feature-based clustering.
 4. **Scalability for Large Repositories**:
-   - Virtualization or LOD (Level-of-Detail) rendering when repositories have >500 files or >2,000 symbols.
+   - Implement virtualization or LOD (Level-of-Detail) rendering for repositories with >500 files or >2,000 symbols.
