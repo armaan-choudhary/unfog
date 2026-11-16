@@ -2,6 +2,36 @@ import { Node, Edge, MarkerType } from "@xyflow/react";
 import { SourceGraph, SourceFile, SourceSymbol, L1GroupSummary } from "./types";
 import { CodebaseNodeData } from "../components/Map/CustomNode";
 
+export interface CodebaseEdgeData extends Record<string, unknown> {
+  edgeType: "direct" | "aggregated";
+  count: number;
+  kinds: string[];
+  underlyingEdgeIds: string[];
+  sourceSymbolId?: string;
+  targetSymbolId?: string;
+}
+
+export interface BlastRadiusResult {
+  activeNodeId: string;
+  activeRawId: string;
+  activeKind: string;
+  activeName: string;
+  isHoverPreview: boolean;
+  descendantNodeIds?: Set<string>;
+
+  inboundNodeIds: Set<string>;
+  outboundNodeIds: Set<string>;
+  inboundEdgeIds: Set<string>;
+  outboundEdgeIds: Set<string>;
+
+  inboundCount: number;
+  outboundCount: number;
+  directInboundCount: number;
+  directOutboundCount: number;
+  aggregatedInboundCount: number;
+  aggregatedOutboundCount: number;
+}
+
 /**
  * Derives real directory/module groups (L1) from indexed SourceFiles.
  * Never invents architectural categories unsupported by repository evidence.
@@ -155,7 +185,13 @@ export function buildL1NodesAndEdges(
   // Tally cross-group dependencies
   const crossGroupLinks = new Map<
     string,
-    { source: string; target: string; count: number; kinds: Set<string> }
+    {
+      source: string;
+      target: string;
+      count: number;
+      kinds: Set<string>;
+      underlyingEdgeIds: string[];
+    }
   >();
 
   graph.edges.forEach((edge) => {
@@ -169,9 +205,11 @@ export function buildL1NodesAndEdges(
         target: tgtGroupId,
         count: 0,
         kinds: new Set<string>(),
+        underlyingEdgeIds: [] as string[],
       };
       existing.count += 1;
       existing.kinds.add(edge.kind);
+      existing.underlyingEdgeIds.push(edge.id);
       crossGroupLinks.set(linkKey, existing);
     }
   });
@@ -186,6 +224,12 @@ export function buildL1NodesAndEdges(
       target: link.target,
       type: "bezier",
       label,
+      data: {
+        edgeType: "aggregated",
+        count: link.count,
+        kinds: Array.from(link.kinds),
+        underlyingEdgeIds: link.underlyingEdgeIds,
+      } satisfies CodebaseEdgeData,
       labelStyle: {
         fill: "var(--color-text-muted)",
         fontSize: 10,
@@ -345,7 +389,7 @@ export function buildUnifiedHierarchyNodesAndEdges(
 
       groupFiles.forEach((f) => {
         const isFileExpanded = expandedFileIds.has(f.id);
-        let fileH = 175;
+        let fileH = 240;
 
         if (isFileExpanded) {
           const syms = symbolsByFileId.get(f.id) || [];
@@ -416,7 +460,7 @@ export function buildUnifiedHierarchyNodesAndEdges(
         id: g.id,
         type: "groupNode",
         position: { x: gx, y: gy },
-        style: { width: dim.width, height: dim.height },
+        style: { width: dim.width, height: dim.height, zIndex: 0 },
         data: {
           id: g.id,
           name: g.name,
@@ -450,7 +494,11 @@ export function buildUnifiedHierarchyNodesAndEdges(
           position: { x: layout.relX, y: layout.relY },
           parentId: g.id,
           extent: "parent",
-          style: { width: layout.width, height: layout.height },
+          style: {
+            width: layout.width,
+            height: layout.height,
+            zIndex: isFileExpanded ? 2 : 5,
+          },
           data: {
             id: file.id,
             name: file.path.split("/").pop() || file.path,
@@ -536,6 +584,14 @@ export function buildUnifiedHierarchyNodesAndEdges(
         target: tgtSymNodeId,
         type: "bezier",
         label: edge.kind,
+        data: {
+          edgeType: "direct",
+          count: 1,
+          kinds: [edge.kind],
+          underlyingEdgeIds: [edge.id],
+          sourceSymbolId: edge.source_symbol_id,
+          targetSymbolId: edge.target_symbol_id,
+        } satisfies CodebaseEdgeData,
         labelStyle: {
           fill: "var(--color-text-muted)",
           fontSize: 9,
@@ -570,6 +626,7 @@ export function buildUnifiedHierarchyNodesAndEdges(
       target: string;
       count: number;
       kinds: Set<string>;
+      underlyingEdgeIds: string[];
       isIntraGroup: boolean;
     }
   >();
@@ -625,10 +682,12 @@ export function buildUnifiedHierarchyNodesAndEdges(
       target: tgtEndpoint,
       count: 0,
       kinds: new Set<string>(),
+      underlyingEdgeIds: [] as string[],
       isIntraGroup: isIntra,
     };
     existing.count += 1;
     existing.kinds.add(edge.kind);
+    existing.underlyingEdgeIds.push(edge.id);
     aggregatedEdges.set(edgeKey, existing);
   });
 
@@ -638,6 +697,9 @@ export function buildUnifiedHierarchyNodesAndEdges(
     const strokeColor = isIntra
       ? "var(--color-accent-blue)"
       : "var(--color-accent-violet)";
+    const isDirect =
+      entry.source.startsWith("node-sym-") &&
+      entry.target.startsWith("node-sym-");
 
     edges.push({
       id: `edge-${key}`,
@@ -645,6 +707,12 @@ export function buildUnifiedHierarchyNodesAndEdges(
       target: entry.target,
       type: "bezier",
       label: `${entry.count} ${entry.count === 1 ? "dep" : "deps"} (${kindsStr})`,
+      data: {
+        edgeType: isDirect ? "direct" : "aggregated",
+        count: entry.count,
+        kinds: Array.from(entry.kinds),
+        underlyingEdgeIds: entry.underlyingEdgeIds,
+      } satisfies CodebaseEdgeData,
       labelStyle: {
         fill: "var(--color-text-muted)",
         fontSize: 10,
@@ -758,7 +826,13 @@ export function buildL2NodesAndEdges(
 
   const fileEdgesMap = new Map<
     string,
-    { source: string; target: string; count: number; kinds: Set<string> }
+    {
+      source: string;
+      target: string;
+      count: number;
+      kinds: Set<string>;
+      underlyingEdgeIds: string[];
+    }
   >();
 
   graph.edges.forEach((edge) => {
@@ -772,9 +846,11 @@ export function buildL2NodesAndEdges(
         target: `node-file-${tgtFileId}`,
         count: 0,
         kinds: new Set<string>(),
+        underlyingEdgeIds: [] as string[],
       };
       existing.count += 1;
       existing.kinds.add(edge.kind);
+      existing.underlyingEdgeIds.push(edge.id);
       fileEdgesMap.set(edgeKey, existing);
     }
   });
@@ -787,6 +863,12 @@ export function buildL2NodesAndEdges(
       target: entry.target,
       type: "bezier",
       label: `${entry.count} ${kindsStr}`,
+      data: {
+        edgeType: "aggregated",
+        count: entry.count,
+        kinds: Array.from(entry.kinds),
+        underlyingEdgeIds: entry.underlyingEdgeIds,
+      } satisfies CodebaseEdgeData,
       labelStyle: {
         fill: "var(--color-text-muted)",
         fontSize: 10,
@@ -916,6 +998,14 @@ export function buildL3NodesAndEdges(
         target: `node-sym-${edge.target_symbol_id}`,
         type: "bezier",
         label: edge.kind,
+        data: {
+          edgeType: "direct",
+          count: 1,
+          kinds: [edge.kind],
+          underlyingEdgeIds: [edge.id],
+          sourceSymbolId: edge.source_symbol_id,
+          targetSymbolId: edge.target_symbol_id,
+        } satisfies CodebaseEdgeData,
         labelStyle: {
           fill: "var(--color-text-muted)",
           fontSize: 10,
@@ -988,4 +1078,397 @@ export function findHierarchyLocationForPath(
     groupId: group ? group.id : "group-root",
     fileId: file.id,
   };
+}
+
+/**
+ * Calculates verified incoming and outgoing blast radius relationships from indexed edges.
+ * Supports active nodes at any level: Group (L1), File (L2), or Symbol (L3).
+ */
+export function calculateBlastRadius(
+  activeNodeId: string,
+  nodes: Node[],
+  edges: Edge[],
+  graph: SourceGraph,
+  groups: L1GroupSummary[],
+  isHoverPreview = false,
+): BlastRadiusResult | null {
+  const activeNode = nodes.find((n) => n.id === activeNodeId);
+  if (!activeNode) return null;
+
+  const nodeData = activeNode.data as unknown as CodebaseNodeData;
+  const activeKind = (nodeData?.kind as string) || "unknown";
+  const activeName = (nodeData?.name as string) || activeNodeId;
+  const activeRawId = (nodeData?.id as string) || activeNodeId;
+
+  // Collect active node and all its child/descendant nodes currently on canvas
+  const activeNodeAndDescendantIds = new Set<string>([activeNodeId]);
+
+  // If active node is an expanded group, include its child file nodes and symbol nodes
+  nodes.forEach((n) => {
+    if (n.parentId === activeNodeId) {
+      activeNodeAndDescendantIds.add(n.id);
+    }
+  });
+
+  // If active node is a file node (e.g. node-file-xxx), also include its child symbol nodes if visible
+  if (activeNodeId.startsWith("node-file-")) {
+    const rawFileId = activeRawId;
+    const fileSymbols = graph.symbols.filter((s) => s.file_id === rawFileId);
+    const symNodeIdSet = new Set(fileSymbols.map((s) => `node-sym-${s.id}`));
+    nodes.forEach((n) => {
+      if (symNodeIdSet.has(n.id)) {
+        activeNodeAndDescendantIds.add(n.id);
+      }
+    });
+  }
+
+  // If active node is a group node (e.g. group-xxx), include all files and symbols in this group
+  if (activeNodeId.startsWith("group-") || activeKind === "group") {
+    const group = groups.find(
+      (g) => g.id === activeRawId || g.id === activeNodeId,
+    );
+    if (group) {
+      const fileIdSet = new Set(group.fileIds);
+      const groupSymbols = graph.symbols.filter((s) =>
+        fileIdSet.has(s.file_id),
+      );
+      const fileNodeIdSet = new Set(
+        group.fileIds.map((fid) => `node-file-${fid}`),
+      );
+      const symNodeIdSet = new Set(groupSymbols.map((s) => `node-sym-${s.id}`));
+      nodes.forEach((n) => {
+        if (fileNodeIdSet.has(n.id) || symNodeIdSet.has(n.id)) {
+          activeNodeAndDescendantIds.add(n.id);
+        }
+      });
+    }
+  }
+
+  const inboundNodeIds = new Set<string>();
+  const outboundNodeIds = new Set<string>();
+  const inboundEdgeIds = new Set<string>();
+  const outboundEdgeIds = new Set<string>();
+
+  let inboundCount = 0;
+  let outboundCount = 0;
+  let directInboundCount = 0;
+  let directOutboundCount = 0;
+  let aggregatedInboundCount = 0;
+  let aggregatedOutboundCount = 0;
+
+  edges.forEach((edge) => {
+    // Skip contains- edges (hierarchy containment, not dependencies)
+    if (edge.id.startsWith("edge-contains-")) return;
+
+    const edgeData = edge.data as CodebaseEdgeData | undefined;
+    const weight = edgeData?.count ?? 1;
+    const isDirect =
+      edgeData?.edgeType === "direct" ||
+      (edge.source.startsWith("node-sym-") &&
+        edge.target.startsWith("node-sym-"));
+
+    const isSourceActive = activeNodeAndDescendantIds.has(edge.source);
+    const isTargetActive = activeNodeAndDescendantIds.has(edge.target);
+
+    // If both endpoints are inside the active node, it's internal
+    if (isSourceActive && isTargetActive) {
+      return;
+    }
+
+    if (isSourceActive && !isTargetActive) {
+      // Outbound from active node
+      outboundEdgeIds.add(edge.id);
+      outboundNodeIds.add(edge.target);
+      outboundCount += weight;
+      if (isDirect) {
+        directOutboundCount += weight;
+      } else {
+        aggregatedOutboundCount += weight;
+      }
+    } else if (isTargetActive && !isSourceActive) {
+      // Inbound to active node
+      inboundEdgeIds.add(edge.id);
+      inboundNodeIds.add(edge.source);
+      inboundCount += weight;
+      if (isDirect) {
+        directInboundCount += weight;
+      } else {
+        aggregatedInboundCount += weight;
+      }
+    }
+  });
+
+  return {
+    activeNodeId,
+    activeRawId,
+    activeKind,
+    activeName,
+    isHoverPreview,
+    descendantNodeIds: activeNodeAndDescendantIds,
+    inboundNodeIds,
+    outboundNodeIds,
+    inboundEdgeIds,
+    outboundEdgeIds,
+    inboundCount,
+    outboundCount,
+    directInboundCount,
+    directOutboundCount,
+    aggregatedInboundCount,
+    aggregatedOutboundCount,
+  };
+}
+
+/**
+ * Applies blast radius styling to graph nodes and edges without recalculating layout positions:
+ * - Inbound connections in Teal (#71c2bd)
+ * - Outbound connections in Violet (#7665ca)
+ * - Dims unrelated nodes and edges to 20-30% opacity
+ * - Preserves ancestor containers so child cards are not visually obscured
+ */
+export function applyBlastRadiusToGraph(
+  nodes: Node[],
+  edges: Edge[],
+  blastRadius: BlastRadiusResult | null,
+): { nodes: Node[]; edges: Edge[] } {
+  if (!blastRadius) {
+    // Normal graph state: clear blast radius overrides, restore normal opacity
+    const restoredNodes = nodes.map((node) => {
+      const data = node.data as unknown as CodebaseNodeData;
+      if (!data.blastRadiusState || data.blastRadiusState === "normal") {
+        return node;
+      }
+      return {
+        ...node,
+        style: {
+          ...node.style,
+          opacity: 1,
+        },
+        data: {
+          ...data,
+          blastRadiusState: "normal" as const,
+        },
+      };
+    });
+
+    const restoredEdges = edges.map((edge) => {
+      const edgeData = edge.data as CodebaseEdgeData | undefined;
+      const isDirect = edgeData?.edgeType === "direct";
+      const strokeColor = isDirect
+        ? "var(--color-accent-violet)"
+        : "var(--color-accent-violet)";
+      return {
+        ...edge,
+        style: {
+          ...edge.style,
+          stroke:
+            edge.style?.stroke &&
+            edge.style.stroke !== "#71c2bd" &&
+            edge.style.stroke !== "#7665ca"
+              ? edge.style.stroke
+              : strokeColor,
+          opacity: 1,
+        },
+        animated: edge.animated ?? true,
+      };
+    });
+
+    return { nodes: restoredNodes, edges: restoredEdges };
+  }
+
+  // Active blast radius:
+  // Preserved nodes: active node, all descendants, inbound sources, outbound targets, and their parent containers
+  const preservedNodeIds = new Set<string>([blastRadius.activeNodeId]);
+  blastRadius.inboundNodeIds.forEach((id) => preservedNodeIds.add(id));
+  blastRadius.outboundNodeIds.forEach((id) => preservedNodeIds.add(id));
+  if (blastRadius.descendantNodeIds) {
+    blastRadius.descendantNodeIds.forEach((id) => preservedNodeIds.add(id));
+  }
+
+  // Also preserve all parent containers of preserved nodes (going UP)
+  const parentMap = new Map<string, string>();
+  nodes.forEach((n) => {
+    if (n.parentId) parentMap.set(n.id, n.parentId);
+  });
+
+  preservedNodeIds.forEach((id) => {
+    let p = parentMap.get(id);
+    while (p) {
+      preservedNodeIds.add(p);
+      p = parentMap.get(p);
+    }
+  });
+
+  // Preserve all child nodes of any preserved/active container (going DOWN)
+  // Selecting or highlighting an expanded parent must NEVER gray out its child nodes!
+  const containerPaths = new Set<string>();
+  const containerParentIds = new Set<string>();
+
+  preservedNodeIds.forEach((id) => {
+    containerParentIds.add(id);
+    const n = nodes.find((node) => node.id === id);
+    const nData = n?.data as unknown as CodebaseNodeData;
+    if (nData?.path) {
+      containerPaths.add(nData.path);
+    }
+  });
+
+  nodes.forEach((n) => {
+    const nData = n.data as unknown as CodebaseNodeData;
+    // 1. Direct parentId match (e.g. child file or symbol of an expanded group)
+    if (n.parentId && containerParentIds.has(n.parentId)) {
+      preservedNodeIds.add(n.id);
+    }
+    // 2. File path match (e.g. child symbol belonging to an expanded file container)
+    if (nData?.path && containerPaths.has(nData.path)) {
+      preservedNodeIds.add(n.id);
+    }
+  });
+
+  // Calculate per-node blast radius state
+  const updatedNodes = nodes.map((node) => {
+    const data = node.data as unknown as CodebaseNodeData;
+    const isPreserved = preservedNodeIds.has(node.id);
+    const isActive = node.id === blastRadius.activeNodeId;
+    const isInbound = blastRadius.inboundNodeIds.has(node.id);
+    const isOutbound = blastRadius.outboundNodeIds.has(node.id);
+
+    let state:
+      "active" | "inbound" | "outbound" | "both" | "dimmed" | "normal" =
+      "normal";
+
+    if (isActive) {
+      state = "active";
+    } else if (isInbound && isOutbound) {
+      state = "both";
+    } else if (isInbound) {
+      state = "inbound";
+    } else if (isOutbound) {
+      state = "outbound";
+    } else if (!isPreserved) {
+      state = "dimmed";
+    } else {
+      state = "normal";
+    }
+
+    const opacity = isPreserved ? 1.0 : 0.25;
+
+    return {
+      ...node,
+      style: {
+        ...node.style,
+        opacity,
+      },
+      data: {
+        ...data,
+        blastRadiusState: state,
+      },
+    };
+  });
+
+  // Calculate per-edge blast radius state
+  const updatedEdges = edges.map((edge) => {
+    // Skip contains edges
+    if (edge.id.startsWith("edge-contains-")) {
+      const isPreserved =
+        preservedNodeIds.has(edge.source) && preservedNodeIds.has(edge.target);
+      return {
+        ...edge,
+        style: {
+          ...edge.style,
+          opacity: isPreserved ? 0.7 : 0.15,
+        },
+      };
+    }
+
+    const isInbound = blastRadius.inboundEdgeIds.has(edge.id);
+    const isOutbound = blastRadius.outboundEdgeIds.has(edge.id);
+
+    if (isInbound) {
+      return {
+        ...edge,
+        style: {
+          ...edge.style,
+          stroke: "#71c2bd", // Teal for Inbound
+          strokeWidth: 2.5,
+          opacity: 1.0,
+        },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: "#71c2bd",
+          width: 14,
+          height: 14,
+        },
+        labelStyle: {
+          fill: "#71c2bd",
+          fontSize: 10,
+          fontWeight: 700,
+        },
+        labelBgStyle: {
+          fill: "rgba(18, 30, 32, 0.95)",
+          color: "#71c2bd",
+          fillOpacity: 0.95,
+        },
+        animated: true,
+        zIndex: 15,
+      };
+    }
+
+    if (isOutbound) {
+      return {
+        ...edge,
+        style: {
+          ...edge.style,
+          stroke: "#7665ca", // Violet for Outbound
+          strokeWidth: 2.5,
+          opacity: 1.0,
+        },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: "#7665ca",
+          width: 14,
+          height: 14,
+        },
+        labelStyle: {
+          fill: "#c4b5fd",
+          fontSize: 10,
+          fontWeight: 700,
+        },
+        labelBgStyle: {
+          fill: "rgba(28, 20, 42, 0.95)",
+          color: "#c4b5fd",
+          fillOpacity: 0.95,
+        },
+        animated: true,
+        zIndex: 15,
+      };
+    }
+
+    // Unrelated edge: dim to 20% opacity
+    return {
+      ...edge,
+      style: {
+        ...edge.style,
+        stroke: "var(--color-border)",
+        strokeWidth: 1,
+        opacity: 0.2,
+      },
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        color: "var(--color-border)",
+        width: 10,
+        height: 10,
+      },
+      labelStyle: {
+        opacity: 0.2,
+      },
+      labelBgStyle: {
+        fill: "var(--color-panel)",
+        fillOpacity: 0.2,
+      },
+      animated: false,
+      zIndex: 12,
+    };
+  });
+
+  return { nodes: updatedNodes, edges: updatedEdges };
 }

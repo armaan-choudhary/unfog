@@ -183,6 +183,40 @@ export default function DashboardPage() {
     [graph],
   );
 
+  const handleFocusRelationships = useCallback(
+    (
+      _direction: "callers" | "dependencies" | "inbound" | "outbound",
+      symbolId: string,
+    ) => {
+      if (symbolId) {
+        const matchingSym = graph.symbols.find((s) => s.id === symbolId);
+        if (matchingSym) {
+          const file = graph.files.find((f) => f.id === matchingSym.file_id);
+          setSelectedNode({
+            id: matchingSym.id,
+            name: matchingSym.name,
+            kind: matchingSym.kind,
+            path: file?.path || "",
+            qualifiedName: matchingSym.qualified_name || undefined,
+            range: matchingSym.range,
+            docstring: matchingSym.docstring || undefined,
+          });
+        }
+      }
+    },
+    [graph],
+  );
+
+  const currentRepoOption = repositories.find((r) => r.id === selectedRepoId);
+  const isBundled =
+    currentRepoOption?.isBundled ?? selectedRepoId === "sample_service";
+  const repoOwner = currentRepoOption?.owner;
+  const repoName = currentRepoOption?.repo || currentRepoOption?.name;
+  const commitSha =
+    graph.snapshot?.revision?.kind === "git_commit"
+      ? graph.snapshot.revision.value
+      : undefined;
+
   return (
     <div className="appContainer">
       {/* Top Header */}
@@ -215,6 +249,11 @@ export default function DashboardPage() {
           activeTab={activeTab}
           onChangeTab={setActiveTab}
           onNavigateCitation={handleNavigateCitation}
+          onFocusRelationships={handleFocusRelationships}
+          repoOwner={repoOwner}
+          repoName={repoName}
+          commitSha={commitSha}
+          isBundled={isBundled}
         />
       </div>
     </div>

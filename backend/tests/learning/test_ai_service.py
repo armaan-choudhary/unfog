@@ -317,3 +317,66 @@ def test_react_component_explain_offline(tmp_path: Path, monkeypatch: pytest.Mon
     assert resp.model == "offline-fallback"
     assert "Button.tsx" in resp.citations[0].path
     assert "frontend presentation" in resp.explanation or "react_app" in resp.explanation
+
+
+def test_contextual_prompt_suggestions_generation() -> None:
+    from app.ai.context import get_contextual_prompt_suggestions
+
+    # 1. Component
+    comp_suggs = get_contextual_prompt_suggestions(
+        path="components/UserCard.tsx",
+        symbol_name="UserCard",
+        symbol_kind="component",
+    )
+    labels = [s["label"] for s in comp_suggs]
+    assert any("component" in lbl.lower() for lbl in labels)
+    assert any("rendered" in lbl.lower() for lbl in labels)
+    assert any("dependencies" in lbl.lower() for lbl in labels)
+
+    # 2. Function
+    func_suggs = get_contextual_prompt_suggestions(
+        path="service/auth.py",
+        symbol_name="verify_token",
+        symbol_kind="function",
+    )
+    func_labels = [s["label"] for s in func_suggs]
+    assert any("verify_token" in lbl for lbl in func_labels)
+    assert any("called" in lbl.lower() for lbl in func_labels)
+    assert any("dependencies" in lbl.lower() for lbl in func_labels)
+
+    # 3. Class
+    class_suggs = get_contextual_prompt_suggestions(
+        path="service/errors.py",
+        symbol_name="ServiceError",
+        symbol_kind="class",
+    )
+    class_labels = [s["label"] for s in class_suggs]
+    assert any("class" in lbl.lower() for lbl in class_labels)
+    assert any("used" in lbl.lower() for lbl in class_labels)
+
+    # 4. Whole repo
+    repo_suggs = get_contextual_prompt_suggestions()
+    repo_labels = [s["label"] for s in repo_suggs]
+    assert "Explain Architecture" in repo_labels
+    assert "Trace execution flow" in repo_labels
+    assert "Error handling" in repo_labels
+
+
+def test_relationship_aware_citation_retrieval() -> None:
+    # Query for callers of verify_token at active_path
+    cits_caller = retrieve_relevant_citations_for_query(
+        "Where is this called in the codebase?",
+        active_path="service/auth.py",
+        repo_id="sample_service",
+    )
+    assert len(cits_caller) >= 1
+    assert any(c.path == "service/auth.py" for c in cits_caller)
+
+    # Query for dependencies of orders
+    cits_dep = retrieve_relevant_citations_for_query(
+        "Explain dependencies of this module",
+        active_path="service/orders.py",
+        repo_id="sample_service",
+    )
+    assert len(cits_dep) >= 1
+    assert any(c.path == "service/orders.py" for c in cits_dep)

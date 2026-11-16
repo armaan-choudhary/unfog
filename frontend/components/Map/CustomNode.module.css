@@ -35,6 +35,87 @@
     0 8px 24px rgba(113, 194, 189, 0.35) !important;
 }
 
+/* Dependency Blast Radius Visual States */
+.blastActive {
+  border-color: #a78bfa !important;
+  box-shadow:
+    0 0 0 2px #a78bfa,
+    0 8px 32px rgba(167, 139, 250, 0.5) !important;
+  background-color: var(--color-panel-raised) !important;
+}
+
+.blastInbound {
+  border-color: #71c2bd !important;
+  box-shadow:
+    0 0 0 2px #71c2bd,
+    0 8px 28px rgba(113, 194, 189, 0.45) !important;
+}
+
+.blastOutbound {
+  border-color: #7665ca !important;
+  box-shadow:
+    0 0 0 2px #7665ca,
+    0 8px 28px rgba(118, 101, 202, 0.45) !important;
+}
+
+.blastBoth {
+  border-color: #71c2bd !important;
+  box-shadow:
+    0 0 0 2px #71c2bd,
+    0 0 0 4px #7665ca,
+    0 8px 30px rgba(118, 101, 202, 0.45) !important;
+}
+
+.blastDimmed {
+  opacity: 0.25 !important;
+  transition: opacity 0.25s ease !important;
+}
+
+.inboundBadge {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.35rem;
+  background-color: rgba(113, 194, 189, 0.2);
+  color: #71c2bd;
+  border: 1px solid rgba(113, 194, 189, 0.6);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  white-space: nowrap;
+}
+
+.outboundBadge {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.35rem;
+  background-color: rgba(118, 101, 202, 0.25);
+  color: #c4b5fd;
+  border: 1px solid rgba(118, 101, 202, 0.6);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  white-space: nowrap;
+}
+
+.bothBadge {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.35rem;
+  background-color: rgba(167, 139, 250, 0.2);
+  color: #c4b5fd;
+  border: 1px solid #71c2bd;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  white-space: nowrap;
+}
+
 .nodeHeader {
   display: flex;
   align-items: center;
@@ -127,7 +208,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  pointer-events: all;
+  pointer-events: none;
   backdrop-filter: blur(8px);
   box-sizing: border-box;
   transition:
@@ -136,6 +217,11 @@
   animation:
     cardAppear 0.28s cubic-bezier(0.16, 1, 0.3, 1) both,
     groupGlowPulse 0.75s ease-out 0.05s;
+}
+
+.groupExpandedContainer.selected,
+.groupExpandedContainer.blastActive {
+  background-color: rgba(18, 18, 24, 0.85) !important;
 }
 
 .groupExpandedContainer:hover {
@@ -151,6 +237,7 @@
   border-bottom: 1px solid rgba(167, 139, 250, 0.25);
   border-top-left-radius: var(--radius-card);
   border-top-right-radius: var(--radius-card);
+  pointer-events: all;
 }
 
 .headerLeft {
@@ -289,7 +376,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  pointer-events: all;
+  pointer-events: none;
   backdrop-filter: blur(8px);
   box-sizing: border-box;
   transition:
@@ -298,6 +385,11 @@
   animation:
     cardAppear 0.28s cubic-bezier(0.16, 1, 0.3, 1) both,
     fileGlowPulse 0.75s ease-out 0.05s;
+}
+
+.fileExpandedContainer.selected,
+.fileExpandedContainer.blastActive {
+  background-color: rgba(16, 22, 32, 0.88) !important;
 }
 
 .fileExpandedContainer:hover {
@@ -313,6 +405,7 @@
   border-bottom: 1px solid rgba(56, 189, 248, 0.25);
   border-top-left-radius: var(--radius-card);
   border-top-right-radius: var(--radius-card);
+  pointer-events: all;
 }
 
 .fileExpandedTitle {

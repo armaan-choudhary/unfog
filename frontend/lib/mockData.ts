@@ -645,6 +645,7 @@ export const MOCK_CHALLENGES: LearningChallenge[] = [
     id: "challenge-locate-auth",
     type: "locate",
     title: "Locate Token Verification",
+    goal: "Architecture & Entrypoints",
     prompt:
       "Which function is responsible for validating the incoming bearer token and verifying cryptographic signatures?",
     options: [
@@ -654,32 +655,139 @@ export const MOCK_CHALLENGES: LearningChallenge[] = [
       "check_permission",
     ],
     target_path: "service/auth.py",
-    hint: "Inspect `service/auth.py` around line 12. Look for the function checking header format and HMAC SHA256 digest.",
+    hint: "Inspect `service/auth.py` around line 41. Look for the function checking header format and HMAC-SHA256 digest.",
+    code_excerpt: {
+      path: "service/auth.py",
+      range: { start_line: 41, end_line: 71 },
+      snippet: `def verify_token(token: str) -> dict[str, Any]:
+    """Validates bearer tokens."""
+    if not token or not isinstance(token, str):
+        raise AuthenticationError("Token is missing or malformed.")
+
+    parts = token.strip().split(".")
+    if len(parts) != 3:
+        raise AuthenticationError("Bearer token format invalid.")
+
+    user_id, expires_str, signature = parts
+    try:
+        expires_at = int(expires_str)
+    except ValueError as exc:
+        raise AuthenticationError("Token timestamp is invalid.") from exc
+
+    current_time = int(time.time())
+    if current_time > expires_at:
+        raise AuthenticationError("Bearer token has expired.")
+
+    expected_data = f"{user_id}:{expires_at}".encode("utf-8")
+    expected_sig = hmac.new(
+        TOKEN_SECRET.encode("utf-8"), expected_data, hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(signature, expected_sig):
+        raise AuthenticationError("Token signature validation failed.")
+
+    return {
+        "sub": user_id,
+        "permissions": ["orders:read", "orders:write"],
+    }`,
+    },
+    solution_explanation:
+      "`verify_token` in `service/auth.py` parses the bearer token, verifies that it hasn't expired, and compares HMAC-SHA256 digests in constant time (`hmac.compare_digest`) to prevent timing side-channel attacks.",
   },
   {
     id: "challenge-trace-order",
     type: "trace",
     title: "Trace Order Processing Flow",
+    goal: "Call Graph & Data Flow",
     prompt:
-      "When an order is submitted to `OrderProcessor.process_order`, what is the very first validation check performed?",
+      "When an order is submitted to `OrderManager.create_order`, what is the very first validation check performed?",
     options: [
-      "Token verification (`verify_token`)",
+      "Token signature (`verify_token`)",
       "Inventory availability check",
       "Calculate shipping fee",
-      "Database connection test",
+      "Payment authorization",
     ],
     target_path: "service/orders.py",
-    hint: "Open `service/orders.py` and inspect the top of `process_order` method around line 18.",
+    hint: "Open `service/orders.py` and inspect the top of the `create_order` method around line 67.",
+    code_excerpt: {
+      path: "service/orders.py",
+      range: { start_line: 51, end_line: 75 },
+      snippet: `    def create_order(
+        self,
+        token: str,
+        items: list[dict[str, Any]],
+        shipping_tier: str = "standard",
+        discount_code: str | None = None,
+    ) -> dict[str, Any]:
+        """Creates and validates a new customer order.
+
+        Validation pipeline sequence:
+        1. Token signature check (validates caller authorization)
+        2. Inventory availability verification
+        3. Pricing and fee computation
+        4. Payment authorization
+        5. Order persistence and tracking number generation
+        """
+        # Step 1: Perform token signature check
+        user_payload = verify_token(token)
+        user_id = user_payload["sub"]`,
+    },
+    solution_explanation:
+      "In `OrderManager.create_order`, execution immediately begins with Step 1: `user_payload = verify_token(token)` to validate caller authorization before any inventory lookups, calculations, or payments occur.",
   },
   {
     id: "challenge-predict-fee",
     type: "predict",
     title: "Predict Fee Calculation",
+    goal: "Business Logic",
     prompt:
       'What does `calculate_fee(100.0, "standard")` return according to the pricing engine logic?',
     options: ["5.0", "8.0", "10.0", "15.0"],
     target_path: "service/pricing.py",
-    hint: "Examine `calculate_fee` in `service/pricing.py`. Note the standard rate condition when amount >= 50.0.",
+    hint: "Examine `calculate_fee` in `service/pricing.py`. Note how the tier matching determines the return value.",
+    code_excerpt: {
+      path: "service/pricing.py",
+      range: { start_line: 25, end_line: 33 },
+      snippet: `def calculate_fee(amount: float, shipping_tier: str = "standard") -> float:
+    """Calculates order processing and shipping fee based on tier and amount."""
+    tier = shipping_tier.strip().lower()
+    if tier == "express":
+        return 15.0
+    if tier == "priority":
+        return 10.0
+    return 5.0`,
+    },
+    solution_explanation:
+      "`calculate_fee` checks `shipping_tier`. For express it returns 15.0, for priority 10.0, and for standard shipping it falls through to return 5.0.",
+  },
+  {
+    id: "challenge-locate-errors",
+    type: "locate",
+    title: "Locate Domain Exception Base",
+    goal: "Architecture & Entrypoints",
+    prompt:
+      "What is the base exception class used for custom domain errors in this service?",
+    options: [
+      "ServiceError",
+      "AppException",
+      "BaseHandlerError",
+      "DomainFault",
+    ],
+    target_path: "service/errors.py",
+    hint: "Check the error hierarchy in `service/errors.py`. Notice the root class with code and message.",
+    code_excerpt: {
+      path: "service/errors.py",
+      range: { start_line: 6, end_line: 13 },
+      snippet: `class ServiceError(Exception):
+    """Base exception for all service domain errors."""
+
+    def __init__(self, message: str, code: str = "service_error") -> None:
+        super().__init__(message)
+        self.message = message
+        self.code = code`,
+    },
+    solution_explanation:
+      "`ServiceError` in `service/errors.py` serves as the root class for domain exceptions, holding a descriptive message and standardized error code (`service_error`).",
   },
 ];
 
@@ -717,17 +825,31 @@ export const MOCK_CHALLENGE_EVALUATIONS: Record<
     },
   },
   "challenge-trace-order": {
+    "Token signature (`verify_token`)": {
+      is_correct: true,
+      score: 100,
+      feedback:
+        "Correct! In `service/orders.py`, `OrderManager.create_order` immediately calls `verify_token` in Step 1 to validate caller authorization before inventory checks or payment processing.",
+      citations: [
+        {
+          path: "service/orders.py",
+          range: { start_line: 67, end_line: 70 },
+          snippet:
+            "# Step 1: Perform token signature check\nuser_payload = verify_token(token)",
+        },
+      ],
+    },
     "Token verification (`verify_token`)": {
       is_correct: true,
       score: 100,
       feedback:
-        "Correct! `process_order` starts by immediately calling `verify_token(auth_header)` in Step 1 before attempting to parse line items or calculate fees.",
+        "Correct! `create_order` starts by immediately calling `verify_token(token)` in Step 1 before attempting to parse line items or calculate fees.",
       citations: [
         {
           path: "service/orders.py",
-          range: { start_line: 17, end_line: 20 },
+          range: { start_line: 67, end_line: 70 },
           snippet:
-            "# Step 1: Token verification\nuser_info = verify_token(auth_header)",
+            "# Step 1: Perform token signature check\nuser_payload = verify_token(token)",
         },
       ],
     },
@@ -735,12 +857,12 @@ export const MOCK_CHALLENGE_EVALUATIONS: Record<
       is_correct: false,
       score: 0,
       feedback:
-        "Incorrect. Look at `OrderProcessor.process_order`: token verification happens before any inventory checks or database writes.",
+        "Incorrect. Look at `OrderManager.create_order`: token signature verification happens before any inventory checks or database writes.",
       citations: [
         {
           path: "service/orders.py",
-          range: { start_line: 17, end_line: 20 },
-          snippet: "user_info = verify_token(auth_header)",
+          range: { start_line: 67, end_line: 70 },
+          snippet: "user_payload = verify_token(token)",
         },
       ],
     },
@@ -750,13 +872,13 @@ export const MOCK_CHALLENGE_EVALUATIONS: Record<
       is_correct: true,
       score: 100,
       feedback:
-        "Correct! For subtotal >= 50.0 with standard shipping, `base_fee` is 5.0 and no additional express surcharge is applied.",
+        "Correct! According to `calculate_fee` in `service/pricing.py`, for standard shipping the function returns 5.0.",
       citations: [
         {
           path: "service/pricing.py",
-          range: { start_line: 12, end_line: 18 },
+          range: { start_line: 25, end_line: 33 },
           snippet:
-            'base_fee = 5.0 if amount >= 50.0 else 8.0\nelif shipping_mode == "standard":\n    return base_fee',
+            'def calculate_fee(amount: float, shipping_tier: str = "standard") -> float:\n    tier = shipping_tier.strip().lower()\n    ...\n    return 5.0',
         },
       ],
     },
@@ -764,12 +886,41 @@ export const MOCK_CHALLENGE_EVALUATIONS: Record<
       is_correct: false,
       score: 0,
       feedback:
-        "Incorrect. In `calculate_fee`, `base_fee` evaluates to `5.0` because `amount` (100) >= 50. For standard shipping, it returns `base_fee` directly.",
+        "Incorrect. In `calculate_fee`, `shipping_tier='standard'` falls through the express and priority checks and returns 5.0.",
       citations: [
         {
           path: "service/pricing.py",
-          range: { start_line: 12, end_line: 18 },
-          snippet: "base_fee = 5.0 if amount >= 50.0 else 8.0",
+          range: { start_line: 25, end_line: 33 },
+          snippet: "return 5.0",
+        },
+      ],
+    },
+  },
+  "challenge-locate-errors": {
+    ServiceError: {
+      is_correct: true,
+      score: 100,
+      feedback:
+        "Correct! `ServiceError` in `service/errors.py` serves as the root class for custom domain exceptions, holding a descriptive message and code.",
+      citations: [
+        {
+          path: "service/errors.py",
+          range: { start_line: 6, end_line: 13 },
+          snippet:
+            'class ServiceError(Exception):\n    """Base exception for all service domain errors."""',
+        },
+      ],
+    },
+    default: {
+      is_correct: false,
+      score: 0,
+      feedback:
+        "Incorrect. In `service/errors.py`, all custom exceptions inherit from `ServiceError`.",
+      citations: [
+        {
+          path: "service/errors.py",
+          range: { start_line: 6, end_line: 13 },
+          snippet: "class ServiceError(Exception):",
         },
       ],
     },

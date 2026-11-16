@@ -71,6 +71,25 @@ def test_ai_chat_endpoint_success(client: TestClient) -> None:
     assert "model" in data
 
 
+def test_ai_suggestions_endpoint(client: TestClient) -> None:
+    # 1. Without params (repo-level suggestions)
+    resp = client.get("/api/v1/ai/suggestions")
+    assert resp.status_code == 200
+    suggs = resp.json()
+    assert isinstance(suggs, list)
+    assert len(suggs) >= 3
+    assert any(s["label"] == "Explain Architecture" for s in suggs)
+
+    # 2. With symbol params
+    resp_sym = client.get(
+        "/api/v1/ai/suggestions?path=service/auth.py&symbol_name=verify_token&symbol_kind=function"
+    )
+    assert resp_sym.status_code == 200
+    sym_suggs = resp_sym.json()
+    assert any("verify_token" in s["label"] for s in sym_suggs)
+    assert any("called" in s["label"].lower() for s in sym_suggs)
+
+
 def test_learning_challenges_list(client: TestClient) -> None:
     response = client.get("/api/v1/learning/challenges")
     assert response.status_code == 200
