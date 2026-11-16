@@ -148,14 +148,26 @@ export interface AiChatResponse {
   model: string;
 }
 
+export type AttemptProvenance =
+  | "independent"
+  | "hint_assisted"
+  | "solution_revealed";
+
 export interface LearningChallenge {
   id: string;
   type: "locate" | "trace" | "predict";
   title: string;
+  goal?: string;
   prompt: string;
   options: string[];
   target_path: string;
   hint: string;
+  code_excerpt?: {
+    path: string;
+    range: LineRange;
+    snippet?: string;
+  };
+  solution_explanation?: string;
 }
 
 export interface ChallengeEvaluationRequest {
@@ -163,6 +175,8 @@ export interface ChallengeEvaluationRequest {
   selected_symbol_id?: string;
   selected_path?: string;
   repo_id?: string;
+  hints_used?: number;
+  solution_revealed?: boolean;
 }
 
 export interface ChallengeEvaluationResponse {
@@ -170,6 +184,8 @@ export interface ChallengeEvaluationResponse {
   score: number;
   feedback: string;
   citations: CitationRef[];
+  provenance?: AttemptProvenance;
+  explanation?: string;
 }
 
 export interface GithubImportResponse {
