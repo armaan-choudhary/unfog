@@ -220,13 +220,23 @@ async function runHierarchyVerification() {
     logStep(7, 'Test direct breadcrumb jump (drill into L3 then click "Project")');
     // Drill into L2 again
     const serviceGroup2 = page.locator('.react-flow__node-groupNode', { hasText: 'service' });
-    await serviceGroup2.click();
-    await page.waitForTimeout(300);
+    const exploreBtn2 = serviceGroup2.locator('button', { hasText: 'Explore Group' });
+    if ((await exploreBtn2.count()) > 0) {
+      await exploreBtn2.click();
+    } else {
+      await serviceGroup2.dblclick();
+    }
+    await page.waitForTimeout(400);
 
     // Drill into L3
     const authFile2 = page.locator('.react-flow__node-fileSummaryNode', { hasText: 'auth.py' });
-    await authFile2.click();
-    await page.waitForTimeout(300);
+    const exploreFileBtn2 = authFile2.locator('button', { hasText: 'Explore File' });
+    if ((await exploreFileBtn2.count()) > 0) {
+      await exploreFileBtn2.click();
+    } else {
+      await authFile2.dblclick();
+    }
+    await page.waitForTimeout(400);
 
     // Click "Project" in breadcrumb bar
     await projectBtn.click();

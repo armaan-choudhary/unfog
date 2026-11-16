@@ -35,6 +35,10 @@ export interface CodebaseNodeData extends Record<string, unknown> {
   onExplore?: () => void;
   onToggleExpand?: () => void;
   onSelectSymbol?: (symbolId: string) => void;
+  blastRadiusState?:
+    "active" | "inbound" | "outbound" | "both" | "dimmed" | "normal";
+  blastRadiusInboundCount?: number;
+  blastRadiusOutboundCount?: number;
 }
 
 function getLanguageLabel(path: string, lang?: string): string {
@@ -52,6 +56,28 @@ function getLanguageLabel(path: string, lang?: string): string {
   return "";
 }
 
+function getBlastStateClass(state?: string): string {
+  if (state === "active") return styles.blastActive;
+  if (state === "inbound") return styles.blastInbound;
+  if (state === "outbound") return styles.blastOutbound;
+  if (state === "both") return styles.blastBoth;
+  if (state === "dimmed") return styles.blastDimmed;
+  return "";
+}
+
+function renderBlastBadge(state?: string) {
+  if (state === "inbound") {
+    return <span className={styles.inboundBadge}>← INBOUND</span>;
+  }
+  if (state === "outbound") {
+    return <span className={styles.outboundBadge}>OUTBOUND →</span>;
+  }
+  if (state === "both") {
+    return <span className={styles.bothBadge}>⇄ BIDIRECTIONAL</span>;
+  }
+  return null;
+}
+
 /**
  * L1 Architecture Group Node (Supports both Collapsed and In-Map Expanded states).
  */
@@ -64,7 +90,9 @@ export function GroupNode({ data, selected }: NodeProps) {
       <div
         className={`${styles.groupExpandedContainer} ${
           selected ? styles.selected : ""
-        } ${nodeData.isHighlighted ? styles.highlighted : ""}`}
+        } ${nodeData.isHighlighted ? styles.highlighted : ""} ${getBlastStateClass(
+          nodeData.blastRadiusState,
+        )}`}
         style={{ width: "100%", height: "100%" }}
       >
         <Handle
@@ -84,6 +112,7 @@ export function GroupNode({ data, selected }: NodeProps) {
                 <span className={`${styles.kindBadge} ${styles.kindGroup}`}>
                   EXPANDED
                 </span>
+                {renderBlastBadge(nodeData.blastRadiusState)}
                 <span className={styles.langBadge}>
                   {nodeData.fileCount} files
                 </span>
@@ -134,7 +163,7 @@ export function GroupNode({ data, selected }: NodeProps) {
     <div
       className={`${styles.groupContainer} ${selected ? styles.selected : ""} ${
         nodeData.isHighlighted ? styles.highlighted : ""
-      }`}
+      } ${getBlastStateClass(nodeData.blastRadiusState)}`}
     >
       <Handle type="target" position={Position.Top} className={styles.handle} />
 
@@ -143,6 +172,7 @@ export function GroupNode({ data, selected }: NodeProps) {
           <span className={`${styles.kindBadge} ${styles.kindGroup}`}>
             DIRECTORY
           </span>
+          {renderBlastBadge(nodeData.blastRadiusState)}
           <span className={styles.langBadge}>{nodeData.fileCount} files</span>
         </div>
         <span className={styles.rangeBadge}>
@@ -215,7 +245,9 @@ export function FileSummaryNode({ data, selected }: NodeProps) {
       <div
         className={`${styles.fileExpandedContainer} ${
           selected ? styles.selected : ""
-        } ${nodeData.isHighlighted ? styles.highlighted : ""}`}
+        } ${nodeData.isHighlighted ? styles.highlighted : ""} ${getBlastStateClass(
+          nodeData.blastRadiusState,
+        )}`}
         style={{ width: "100%", height: "100%" }}
       >
         <Handle
@@ -235,6 +267,7 @@ export function FileSummaryNode({ data, selected }: NodeProps) {
                 <span className={`${styles.kindBadge} ${styles.kindFile}`}>
                   L3 EXPANDED
                 </span>
+                {renderBlastBadge(nodeData.blastRadiusState)}
                 {langLabel && (
                   <span className={styles.langBadge}>{langLabel}</span>
                 )}
@@ -279,7 +312,7 @@ export function FileSummaryNode({ data, selected }: NodeProps) {
     <div
       className={`${styles.fileSummaryContainer} ${selected ? styles.selected : ""} ${
         nodeData.isHighlighted ? styles.highlighted : ""
-      }`}
+      } ${getBlastStateClass(nodeData.blastRadiusState)}`}
     >
       <Handle type="target" position={Position.Top} className={styles.handle} />
 
@@ -288,6 +321,7 @@ export function FileSummaryNode({ data, selected }: NodeProps) {
           <span className={`${styles.kindBadge} ${styles.kindFile}`}>
             MODULE
           </span>
+          {renderBlastBadge(nodeData.blastRadiusState)}
           {langLabel && <span className={styles.langBadge}>{langLabel}</span>}
         </div>
         <span className={styles.rangeBadge}>{nodeData.lineCount} lines</span>
@@ -385,7 +419,7 @@ export function SymbolNode({ data, selected }: NodeProps) {
     <div
       className={`${styles.nodeContainer} ${selected ? styles.selected : ""} ${
         nodeData.isHighlighted ? styles.highlighted : ""
-      }`}
+      } ${getBlastStateClass(nodeData.blastRadiusState)}`}
     >
       <Handle type="target" position={Position.Top} className={styles.handle} />
 
@@ -394,6 +428,7 @@ export function SymbolNode({ data, selected }: NodeProps) {
           <span className={`${styles.kindBadge} ${kindClass}`}>
             {nodeData.kind}
           </span>
+          {renderBlastBadge(nodeData.blastRadiusState)}
           {langLabel && <span className={styles.langBadge}>{langLabel}</span>}
         </div>
         {rangeText && <span className={styles.rangeBadge}>{rangeText}</span>}
@@ -442,7 +477,7 @@ export function FileNode({ data, selected }: NodeProps) {
     <div
       className={`${styles.nodeContainer} ${selected ? styles.selected : ""} ${
         nodeData.isHighlighted ? styles.highlighted : ""
-      }`}
+      } ${getBlastStateClass(nodeData.blastRadiusState)}`}
     >
       <Handle type="target" position={Position.Top} className={styles.handle} />
 
@@ -451,6 +486,7 @@ export function FileNode({ data, selected }: NodeProps) {
           <span className={`${styles.kindBadge} ${styles.kindFile}`}>
             MODULE
           </span>
+          {renderBlastBadge(nodeData.blastRadiusState)}
           {langLabel && <span className={styles.langBadge}>{langLabel}</span>}
         </div>
         <span className={styles.rangeBadge}>{nodeData.lineCount} lines</span>

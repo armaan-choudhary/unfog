@@ -149,9 +149,7 @@ export interface AiChatResponse {
 }
 
 export type AttemptProvenance =
-  | "independent"
-  | "hint_assisted"
-  | "solution_revealed";
+  "independent" | "hint_assisted" | "solution_revealed";
 
 export interface LearningChallenge {
   id: string;

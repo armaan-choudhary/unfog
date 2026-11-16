@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useMemo, useState, useCallback, useEffect } from "react";
+import React, {
+  useMemo,
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -20,6 +26,11 @@ import {
   ChevronRight,
   FolderTree,
   FileCode,
+  RotateCcw,
+  SearchX,
+  ArrowDownLeft,
+  ArrowUpRight,
+  X,
 } from "lucide-react";
 import { SourceGraph, HierarchyLevel } from "../../lib/types";
 import {
@@ -34,6 +45,8 @@ import {
   buildUnifiedHierarchyNodesAndEdges,
   findHierarchyLocationForSymbol,
   findHierarchyLocationForPath,
+  calculateBlastRadius,
+  applyBlastRadiusToGraph,
 } from "../../lib/hierarchy";
 import styles from "./CodebaseMap.module.css";
 
@@ -76,6 +89,7 @@ function CodebaseMapInner({
   const [searchQuery, setSearchQuery] = useState("");
   const [filterKind, setFilterKind] = useState<string>("all");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Derive L1 architecture groups from indexed source files
   const l1Groups = useMemo(() => {
@@ -297,26 +311,141 @@ function CodebaseMapInner({
     }
   }, [level, selectedNodeId, nodes, setCenter]);
 
-  // Node click handler
+  // Hover preview and persistent selection state for Dependency Blast Radius
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [userSelectedNodeId, setUserSelectedNodeId] = useState<string | null>(
+    selectedNodeId || null,
+  );
+  const [prevSelectedNodeProp, setPrevSelectedNodeProp] =
+    useState(selectedNodeId);
+
+  // Sync selection when selectedNodeId prop changes (React recommended pattern)
+  if (selectedNodeId !== prevSelectedNodeProp) {
+    setPrevSelectedNodeProp(selectedNodeId);
+    setUserSelectedNodeId(selectedNodeId || null);
+  }
+
+  // Resolve matching canvas node ID for selected entity
+  const selectedCanvasNodeId = useMemo(() => {
+    if (!userSelectedNodeId) return null;
+    const matched = nodes.find((n) => {
+      const d = n.data as unknown as CodebaseNodeData;
+      return (
+        d?.id === userSelectedNodeId ||
+        n.id === userSelectedNodeId ||
+        n.id === `node-sym-${userSelectedNodeId}` ||
+        n.id === `node-file-${userSelectedNodeId}` ||
+        n.id === `group-${userSelectedNodeId}`
+      );
+    });
+    return matched ? matched.id : userSelectedNodeId;
+  }, [userSelectedNodeId, nodes]);
+
+  // Node click handler: selects node persistently and toggles if already selected
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       const nodeData = node.data as unknown as CodebaseNodeData;
       if (!nodeData) return;
 
+      if (
+        userSelectedNodeId === node.id ||
+        userSelectedNodeId === nodeData.id
+      ) {
+        // Toggle/deselect on click of already selected node
+        setUserSelectedNodeId(null);
+        return;
+      }
+
+      setUserSelectedNodeId(node.id);
+      onSelectNode(nodeData);
+    },
+    [userSelectedNodeId, onSelectNode],
+  );
+
+  // Double click toggles expand/collapse for groups and files
+  const handleNodeDoubleClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      const nodeData = node.data as unknown as CodebaseNodeData;
+      if (!nodeData) return;
+
       if (nodeData.kind === "group") {
-        // Toggle in-map expansion on group click
         handleToggleGroup(nodeData.id);
       } else if (nodeData.kind === "file") {
-        // Toggle in-map file symbols expansion (L3)
         handleToggleFile(nodeData.id);
-        onSelectNode(nodeData);
-      } else {
-        // Select symbol and open Source Inspector
-        onSelectNode(nodeData);
       }
     },
-    [handleToggleGroup, handleToggleFile, onSelectNode],
+    [handleToggleGroup, handleToggleFile],
   );
+
+  // Node hover handlers for temporary hover preview
+  const handleNodeMouseEnter = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      setHoveredNodeId(node.id);
+    },
+    [],
+  );
+
+  const handleNodeMouseLeave = useCallback(() => {
+    setHoveredNodeId(null);
+  }, []);
+
+  // Empty canvas pane click clears selection and hover
+  const handlePaneClick = useCallback(() => {
+    setUserSelectedNodeId(null);
+    setHoveredNodeId(null);
+  }, []);
+
+  // Clear selection recovery action
+  const handleClearSelection = useCallback(() => {
+    setUserSelectedNodeId(null);
+    setHoveredNodeId(null);
+  }, []);
+
+  // Clear filters recovery action
+  const handleClearFilters = useCallback(() => {
+    setSearchQuery("");
+    setFilterKind("all");
+  }, []);
+
+  // Keyboard accessibility: Ctrl+K / Cmd+K to focus search, Escape to clear search or selection
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        setIsSearchFocused(true);
+      } else if (e.key === "Escape") {
+        if (searchQuery) {
+          setSearchQuery("");
+        } else if (userSelectedNodeId) {
+          setUserSelectedNodeId(null);
+        }
+        setIsSearchFocused(false);
+        searchInputRef.current?.blur();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [searchQuery, userSelectedNodeId]);
+
+  // Active blast radius target is hovered node (hover preview) or persistently selected node
+  const activeBlastNodeId = hoveredNodeId || selectedCanvasNodeId;
+  const isHoverPreview = Boolean(
+    hoveredNodeId && hoveredNodeId !== selectedCanvasNodeId,
+  );
+
+  const blastRadius = useMemo(() => {
+    if (!activeBlastNodeId) return null;
+    return calculateBlastRadius(
+      activeBlastNodeId,
+      nodes,
+      edges,
+      graph,
+      l1Groups,
+      isHoverPreview,
+    );
+  }, [activeBlastNodeId, nodes, edges, graph, l1Groups, isHoverPreview]);
 
   // Filter nodes for search query and entity kinds
   const filteredNodes = useMemo(() => {
@@ -341,10 +470,21 @@ function CodebaseMapInner({
       return {
         ...node,
         hidden: isHidden,
-        selected: selectedNodeId === data.id,
+        selected:
+          selectedCanvasNodeId === node.id || selectedNodeId === data.id,
       };
     });
-  }, [nodes, filterKind, searchQuery, selectedNodeId]);
+  }, [nodes, filterKind, searchQuery, selectedCanvasNodeId, selectedNodeId]);
+
+  // Apply blast radius styles to nodes & edges without recalculating layout
+  const { nodes: displayNodes, edges: displayEdges } = useMemo(() => {
+    return applyBlastRadiusToGraph(filteredNodes, edges, blastRadius);
+  }, [filteredNodes, edges, blastRadius]);
+
+  // Count visible nodes after filtering
+  const visibleNodeCount = useMemo(() => {
+    return displayNodes.filter((n) => !n.hidden).length;
+  }, [displayNodes]);
 
   // Global repository search results (matches across all symbols and files)
   const searchResults = useMemo(() => {
@@ -586,6 +726,7 @@ function CodebaseMapInner({
           <div className={styles.searchContainer}>
             <Search size={14} className={styles.searchIcon} />
             <input
+              ref={searchInputRef}
               type="text"
               className={styles.searchInput}
               placeholder="Search repository..."
@@ -594,6 +735,23 @@ function CodebaseMapInner({
               onFocus={() => setIsSearchFocused(true)}
               onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
             />
+            {searchQuery ? (
+              <button
+                type="button"
+                className={styles.searchClearBtn}
+                onClick={() => setSearchQuery("")}
+                title="Clear search query"
+              >
+                <X size={12} />
+              </button>
+            ) : (
+              <kbd
+                className={styles.searchKbdShortcut}
+                title="Press Ctrl+K or Cmd+K to search"
+              >
+                ⌘K
+              </kbd>
+            )}
           </div>
 
           {/* Global search auto-complete dropdown */}
@@ -681,14 +839,39 @@ function CodebaseMapInner({
         </div>
       </div>
 
+      {/* Empty Filter State (Recovery Action when 0 nodes match) */}
+      {visibleNodeCount === 0 && (
+        <div className={styles.emptyFilterState}>
+          <SearchX size={36} className={styles.emptyFilterIcon} />
+          <div className={styles.emptyFilterTitle}>No matching nodes found</div>
+          <div className={styles.emptyFilterSubtitle}>
+            {searchQuery && `No codebase entities matching "${searchQuery}"`}
+            {searchQuery && filterKind !== "all" && " with "}
+            {filterKind !== "all" && `kind "${filterKind}"`}
+          </div>
+          <button
+            type="button"
+            className={styles.clearFiltersBtn}
+            onClick={handleClearFilters}
+          >
+            <RotateCcw size={13} />
+            <span>Clear Filters</span>
+          </button>
+        </div>
+      )}
+
       {/* React Flow Canvas */}
       <ReactFlow
-        nodes={filteredNodes}
-        edges={edges}
+        nodes={displayNodes}
+        edges={displayEdges}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}
+        onNodeDoubleClick={handleNodeDoubleClick}
+        onNodeMouseEnter={handleNodeMouseEnter}
+        onNodeMouseLeave={handleNodeMouseLeave}
+        onPaneClick={handlePaneClick}
         fitView
         fitViewOptions={{
           padding: 0.15,
@@ -741,7 +924,75 @@ function CodebaseMapInner({
         />
       </ReactFlow>
 
-      {/* Top Right Semantic Legend */}
+      {/* Dependency Blast Radius HUD */}
+      {blastRadius && (
+        <div className={styles.blastRadiusHud}>
+          <div className={styles.blastRadiusHeader}>
+            <div className={styles.blastRadiusBadgeGroup}>
+              <span className={styles.blastRadiusPulse} />
+              <span className={styles.blastRadiusTitle}>Blast Radius:</span>
+              <span
+                className={styles.blastRadiusNodeName}
+                title={blastRadius.activeName}
+              >
+                {blastRadius.activeName}
+              </span>
+              <span className={styles.blastRadiusKindBadge}>
+                {blastRadius.activeKind}
+              </span>
+              {blastRadius.isHoverPreview ? (
+                <span className={styles.previewTag}>Hover Preview</span>
+              ) : (
+                <span className={styles.selectedTag}>Selected</span>
+              )}
+            </div>
+
+            {!blastRadius.isHoverPreview && (
+              <button
+                type="button"
+                className={styles.clearSelectionBtn}
+                onClick={handleClearSelection}
+                title="Clear node selection and restore normal graph state"
+              >
+                <X size={12} />
+                <span>Clear Selection</span>
+              </button>
+            )}
+          </div>
+
+          <div className={styles.blastRadiusStats}>
+            <div
+              className={styles.statPillInbound}
+              title="Verified incoming relationships from indexed edges (rendered in Teal #71c2bd)"
+            >
+              <ArrowDownLeft size={13} />
+              <span>
+                Inbound: <strong>{blastRadius.inboundCount}</strong>
+              </span>
+              <span className={styles.subCount}>
+                ({blastRadius.directInboundCount} direct,{" "}
+                {blastRadius.aggregatedInboundCount} aggregated)
+              </span>
+            </div>
+
+            <div
+              className={styles.statPillOutbound}
+              title="Verified outgoing relationships from indexed edges (rendered in Violet #7665ca)"
+            >
+              <ArrowUpRight size={13} />
+              <span>
+                Outbound: <strong>{blastRadius.outboundCount}</strong>
+              </span>
+              <span className={styles.subCount}>
+                ({blastRadius.directOutboundCount} direct,{" "}
+                {blastRadius.aggregatedOutboundCount} aggregated)
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Top Right Semantic Legend with Directional Indicators */}
       <div className={styles.legendPanel}>
         <div className={styles.legendItem}>
           <span className={`${styles.legendDot} ${styles.comp}`} />
@@ -759,9 +1010,20 @@ function CodebaseMapInner({
           <span className={`${styles.legendDot} ${styles.file}`} />
           <span>Modules</span>
         </div>
-        <div className={styles.legendItem}>
-          <span className={`${styles.legendDot} ${styles.edge}`} />
-          <span>Dependencies</span>
+        <div className={styles.legendDivider} />
+        <div
+          className={styles.legendItem}
+          title="Inbound dependencies (incoming calls/references rendered in Teal #71c2bd)"
+        >
+          <span className={`${styles.legendDot} ${styles.inboundDot}`} />
+          <span className={styles.inboundLabel}>Inbound (←)</span>
+        </div>
+        <div
+          className={styles.legendItem}
+          title="Outbound dependencies (outgoing calls/references rendered in Violet #7665ca)"
+        >
+          <span className={`${styles.legendDot} ${styles.outboundDot}`} />
+          <span className={styles.outboundLabel}>Outbound (→)</span>
         </div>
       </div>
     </div>

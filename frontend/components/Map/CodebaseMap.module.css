@@ -240,6 +240,37 @@
   color: var(--color-text-muted);
 }
 
+.searchClearBtn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.15s ease;
+}
+
+.searchClearBtn:hover {
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.searchKbdShortcut {
+  font-size: 0.625rem;
+  font-family: inherit;
+  color: var(--color-text-muted);
+  background-color: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 0.25rem;
+  padding: 0.1rem 0.3rem;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+}
+
 .filterGroup {
   display: flex;
   align-items: center;
@@ -321,6 +352,263 @@
   background-color: var(--color-border);
 }
 
+.legendDivider {
+  width: 1px;
+  height: 14px;
+  background-color: var(--color-border);
+  margin: 0 0.15rem;
+}
+
+.legendDot.inboundDot {
+  background-color: #71c2bd;
+  box-shadow: 0 0 6px rgba(113, 194, 189, 0.8);
+}
+
+.legendDot.outboundDot {
+  background-color: #7665ca;
+  box-shadow: 0 0 6px rgba(118, 101, 202, 0.8);
+}
+
+.inboundLabel {
+  color: #71c2bd;
+  font-weight: 600;
+}
+
+.outboundLabel {
+  color: #c4b5fd;
+  font-weight: 600;
+}
+
+/* Empty filter state & recovery action */
+.emptyFilterState {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  background-color: rgba(26, 26, 32, 0.95);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 2rem 2.5rem;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(12px);
+  text-align: center;
+  animation: cardAppear 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.emptyFilterIcon {
+  color: var(--color-text-muted);
+}
+
+.emptyFilterTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.emptyFilterSubtitle {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  max-width: 280px;
+}
+
+.clearFiltersBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background-color: var(--color-accent-violet-soft);
+  border: 1px solid var(--color-accent-violet);
+  color: #ffffff;
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--radius-control);
+  font-size: 0.775rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-top: 0.25rem;
+}
+
+.clearFiltersBtn:hover {
+  background-color: var(--color-accent-violet);
+  box-shadow: 0 0 12px rgba(118, 101, 202, 0.4);
+}
+
+/* Dependency Blast Radius HUD Overlay */
+.blastRadiusHud {
+  position: absolute;
+  bottom: var(--space-4);
+  left: var(--space-4);
+  z-index: 15;
+  background-color: rgba(23, 23, 28, 0.95);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 0.65rem 0.85rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 480px;
+  animation: cardAppear 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.blastRadiusHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.blastRadiusBadgeGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.blastRadiusPulse {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background-color: #a78bfa;
+  box-shadow: 0 0 8px #a78bfa;
+  animation: pulseGlow 1.8s ease-in-out infinite;
+}
+
+@keyframes pulseGlow {
+  0%,
+  100% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+    box-shadow: 0 0 12px #a78bfa;
+  }
+}
+
+.blastRadiusTitle {
+  font-size: 0.725rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.blastRadiusNodeName {
+  font-size: 0.825rem;
+  font-weight: 700;
+  color: #ffffff;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.blastRadiusKindBadge {
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.3rem;
+  background-color: rgba(167, 139, 250, 0.2);
+  color: #c4b5fd;
+  border: 1px solid rgba(167, 139, 250, 0.5);
+}
+
+.previewTag {
+  font-size: 0.625rem;
+  font-weight: 600;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.3rem;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+.selectedTag {
+  font-size: 0.625rem;
+  font-weight: 700;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.3rem;
+  background-color: rgba(118, 101, 202, 0.3);
+  color: #c4b5fd;
+  border: 1px solid #7665ca;
+}
+
+.clearSelectionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.675rem;
+  font-weight: 600;
+  background-color: var(--color-panel-raised);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.clearSelectionBtn:hover {
+  background-color: rgba(244, 63, 94, 0.2);
+  border-color: #f43f5e;
+  color: #fda4af;
+}
+
+.blastRadiusStats {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.statPillInbound {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background-color: rgba(113, 194, 189, 0.15);
+  border: 1px solid rgba(113, 194, 189, 0.45);
+  color: #71c2bd;
+  padding: 0.3rem 0.55rem;
+  border-radius: var(--radius-control);
+  font-size: 0.725rem;
+  font-weight: 600;
+}
+
+.statPillInbound strong {
+  color: #ffffff;
+  font-size: 0.775rem;
+}
+
+.statPillOutbound {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background-color: rgba(118, 101, 202, 0.2);
+  border: 1px solid rgba(118, 101, 202, 0.5);
+  color: #c4b5fd;
+  padding: 0.3rem 0.55rem;
+  border-radius: var(--radius-control);
+  font-size: 0.725rem;
+  font-weight: 600;
+}
+
+.statPillOutbound strong {
+  color: #ffffff;
+  font-size: 0.775rem;
+}
+
+.subCount {
+  font-size: 0.65rem;
+  opacity: 0.8;
+  font-weight: 500;
+}
+
 /* ==========================================================================
    Smooth React Flow Map Animations & Transitions
    ========================================================================== */
@@ -333,6 +621,173 @@
     height 0.35s cubic-bezier(0.16, 1, 0.3, 1),
     opacity 0.25s ease;
   will-change: transform;
+}
+
+/* React Flow Z-Index Layering: Prevent container nodes from covering child symbols or connecting edges */
+
+/* 1. Group Containers (L1/L2) */
+/* Expanded groups sit at the very base (z-index 1-2) so files, symbols, and edges render on top */
+:global(.react-flow__node:has([class*="groupExpandedContainer"])),
+:global(.react-flow__node-groupNode:has([class*="groupExpandedContainer"])),
+:global(
+  .react-flow__node[data-type="groupNode"]:has(
+      [class*="groupExpandedContainer"]
+    )
+) {
+  z-index: 1 !important;
+}
+
+:global(.react-flow__node:has([class*="groupExpandedContainer"]).selected),
+:global(
+  .react-flow__node:has([class*="groupExpandedContainer"]):has(
+      [class*="blastActive"]
+    )
+),
+:global(
+  .react-flow__node-groupNode:has([class*="groupExpandedContainer"]).selected
+),
+:global(
+  .react-flow__node-groupNode:has([class*="groupExpandedContainer"]):has(
+      [class*="blastActive"]
+    )
+),
+:global(
+  .react-flow__node[data-type="groupNode"]:has(
+      [class*="groupExpandedContainer"]
+    ).selected
+),
+:global(
+  .react-flow__node[data-type="groupNode"]:has(
+      [class*="groupExpandedContainer"]
+    ):has([class*="blastActive"])
+) {
+  z-index: 2 !important;
+}
+
+/* 2. File Containers (L3) */
+/* Expanded file containers stay behind connecting edges and symbols (z-index 3-4) */
+:global(.react-flow__node:has([class*="fileExpandedContainer"])),
+:global(
+  .react-flow__node-fileSummaryNode:has([class*="fileExpandedContainer"])
+),
+:global(
+  .react-flow__node[data-type="fileSummaryNode"]:has(
+      [class*="fileExpandedContainer"]
+    )
+) {
+  z-index: 3 !important;
+}
+
+:global(.react-flow__node:has([class*="fileExpandedContainer"]).selected),
+:global(
+  .react-flow__node:has([class*="fileExpandedContainer"]):has(
+      [class*="blastActive"]
+    )
+),
+:global(
+  .react-flow__node-fileSummaryNode:has(
+      [class*="fileExpandedContainer"]
+    ).selected
+),
+:global(
+  .react-flow__node-fileSummaryNode:has([class*="fileExpandedContainer"]):has(
+      [class*="blastActive"]
+    )
+),
+:global(
+  .react-flow__node[data-type="fileSummaryNode"]:has(
+      [class*="fileExpandedContainer"]
+    ).selected
+),
+:global(
+  .react-flow__node[data-type="fileSummaryNode"]:has(
+      [class*="fileExpandedContainer"]
+    ):has([class*="blastActive"])
+) {
+  z-index: 4 !important;
+}
+
+/* 3. Connecting Edges Layer */
+/* Connecting edges MUST render on top of group and file containers (z-index 15 > 4) */
+:global(.react-flow__edges) {
+  z-index: 15 !important;
+}
+
+:global(.react-flow__edge) {
+  z-index: 15 !important;
+}
+
+/* Prevent invisible 20px edge hit-test halo from intercepting pointer clicks on nodes and buttons underneath */
+:global(.react-flow__edge-interaction) {
+  pointer-events: none !important;
+}
+
+:global(.react-flow__edgelabel-renderer) {
+  z-index: 16 !important;
+}
+
+/* 4. Collapsed Cards */
+/* Collapsed file cards and collapsed group cards render on top of edges (z-index 20-22) so connections terminate at border handles cleanly */
+:global(
+  .react-flow__node:not(:has([class*="groupExpandedContainer"])):is(
+      [data-type="groupNode"],
+      .react-flow__node-groupNode
+    )
+),
+:global(
+  .react-flow__node:not(:has([class*="fileExpandedContainer"])):is(
+      [data-type="fileSummaryNode"],
+      .react-flow__node-fileSummaryNode
+    )
+) {
+  z-index: 20 !important;
+}
+
+:global(
+  .react-flow__node:not(:has([class*="groupExpandedContainer"])):is(
+      [data-type="groupNode"],
+      .react-flow__node-groupNode
+    ).selected
+),
+:global(
+  .react-flow__node:not(:has([class*="fileExpandedContainer"])):is(
+      [data-type="fileSummaryNode"],
+      .react-flow__node-fileSummaryNode
+    ).selected
+),
+:global(
+  .react-flow__node:not(:has([class*="groupExpandedContainer"])):is(
+      [data-type="groupNode"],
+      .react-flow__node-groupNode
+    ):has([class*="blastActive"])
+),
+:global(
+  .react-flow__node:not(:has([class*="fileExpandedContainer"])):is(
+      [data-type="fileSummaryNode"],
+      .react-flow__node-fileSummaryNode
+    ):has([class*="blastActive"])
+) {
+  z-index: 22 !important;
+}
+
+/* 5. Symbol Nodes */
+/* Child symbol nodes render on top of containers and edges (z-index 25-30) */
+:global(.react-flow__node[data-type="symbolNode"]),
+:global(.react-flow__node-symbolNode) {
+  z-index: 25 !important;
+}
+
+:global(.react-flow__node[data-type="symbolNode"].selected),
+:global(.react-flow__node-symbolNode.selected),
+:global(.react-flow__node[data-type="symbolNode"]:has([class*="blastActive"])),
+:global(.react-flow__node-symbolNode:has([class*="blastActive"])) {
+  z-index: 30 !important;
+}
+
+/* 6. Edge Labels */
+:global(.react-flow__edge-textwrapper),
+:global(.react-flow__edge-label) {
+  z-index: 35 !important;
 }
 
 /* CRITICAL: Disable transitions during manual dragging for instant 1:1 pointer response */

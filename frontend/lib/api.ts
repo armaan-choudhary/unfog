@@ -7,6 +7,7 @@ import {
   ChallengeEvaluationResponse,
   GithubImportResponse,
   GitHubRepoInfo,
+  AttemptProvenance,
 } from "./types";
 import {
   MOCK_SOURCE_GRAPH,
@@ -331,6 +332,8 @@ export async function evaluateChallenge(
   selectedSymbolId?: string,
   selectedPath?: string,
   repoId?: string,
+  hintsUsed?: number,
+  solutionRevealed?: boolean,
 ): Promise<ChallengeEvaluationResponse> {
   try {
     const res = await fetch(
@@ -343,6 +346,8 @@ export async function evaluateChallenge(
           selected_symbol_id: selectedSymbolId,
           selected_path: selectedPath,
           repo_id: repoId && repoId !== "sample_service" ? repoId : undefined,
+          hints_used: hintsUsed,
+          solution_revealed: solutionRevealed,
         }),
       },
     );
@@ -351,20 +356,41 @@ export async function evaluateChallenge(
     }
     const data = await res.json();
     updateStatus("connected");
-    return data as ChallengeEvaluationResponse;
+    const result = data as ChallengeEvaluationResponse;
+    if (!result.provenance) {
+      result.provenance = solutionRevealed
+        ? "solution_revealed"
+        : (hintsUsed ?? 0) > 0
+          ? "hint_assisted"
+          : "independent";
+    }
+    return result;
   } catch {
+    const provenance: AttemptProvenance = solutionRevealed
+      ? "solution_revealed"
+      : (hintsUsed ?? 0) > 0
+        ? "hint_assisted"
+        : "independent";
+
     const challengeMap = MOCK_CHALLENGE_EVALUATIONS[challengeId];
     if (challengeMap) {
       if (challengeMap[answer]) {
-        return challengeMap[answer];
+        return {
+          ...challengeMap[answer],
+          provenance,
+        };
       }
-      return challengeMap["default"];
+      return {
+        ...challengeMap["default"],
+        provenance,
+      };
     }
     return {
       is_correct: false,
       score: 0,
       feedback: "Evaluation complete.",
       citations: [],
+      provenance,
     };
   }
 }

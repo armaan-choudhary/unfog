@@ -480,7 +480,7 @@ def retrieve_relevant_citations_for_query(
     active_path: str | None = None,
     repo_id: str | None = None,
 ) -> list[RetrievedContext]:
-    """Identify relevant files based on query keywords and active context."""
+    """Identify relevant files based on query, graph edges, and active context."""
     results: list[RetrievedContext] = []
     seen_paths: set[str] = set()
 
@@ -493,6 +493,101 @@ def retrieve_relevant_citations_for_query(
         except (ValueError, FileNotFoundError):
             pass
 
+    q = query.lower()
+
+    # Relationship-aware edge lookups across indexed graph (both sample service and imported repos)
+    try:
+        from app.codeintel.service import get_codebase_service
+
+        svc = get_codebase_service()
+        graph = svc.get_graph(repo_id)
+        if active_path and graph:
+            safe_active = validate_safe_path(active_path)
+            matching_file = next((f for f in graph.files if f.path == safe_active), None)
+            if matching_file:
+                file_symbol_ids = {s.id for s in graph.symbols if s.file_id == matching_file.id}
+                is_caller_query = any(
+                    k in q
+                    for k in (
+                        "called",
+                        "caller",
+                        "call site",
+                        "invoked by",
+                        "who calls",
+                        "where is",
+                    )
+                )
+                is_dep_query = any(
+                    k in q
+                    for k in (
+                        "depend",
+                        "calls",
+                        "import",
+                        "callee",
+                        "uses",
+                        "hierarchy",
+                        "external",
+                    )
+                )
+
+                if is_caller_query:
+                    # Inbound edges: find callers
+                    for edge in graph.edges:
+                        if edge.target_symbol_id in file_symbol_ids and edge.kind in (
+                            "calls",
+                            "references",
+                            "renders",
+                        ):
+                            src_sym = next(
+                                (s for s in graph.symbols if s.id == edge.source_symbol_id), None
+                            )
+                            if src_sym:
+                                src_file = next(
+                                    (f for f in graph.files if f.id == src_sym.file_id), None
+                                )
+                                if src_file and src_file.path not in seen_paths:
+                                    try:
+                                        results.append(
+                                            retrieve_symbol_context(
+                                                src_file.path, src_sym.name, repo_id=repo_id
+                                            )
+                                        )
+                                        seen_paths.add(src_file.path)
+                                    except Exception:
+                                        pass
+                                    if len(results) >= 3:
+                                        break
+                elif is_dep_query:
+                    # Outbound edges: find dependencies
+                    for edge in graph.edges:
+                        if edge.source_symbol_id in file_symbol_ids and edge.kind in (
+                            "calls",
+                            "import",
+                            "renders",
+                            "extends",
+                        ):
+                            tgt_sym = next(
+                                (s for s in graph.symbols if s.id == edge.target_symbol_id), None
+                            )
+                            if tgt_sym:
+                                tgt_file = next(
+                                    (f for f in graph.files if f.id == tgt_sym.file_id), None
+                                )
+                                if tgt_file and tgt_file.path not in seen_paths:
+                                    try:
+                                        results.append(
+                                            retrieve_symbol_context(
+                                                tgt_file.path, tgt_sym.name, repo_id=repo_id
+                                            )
+                                        )
+                                        seen_paths.add(tgt_file.path)
+                                    except Exception:
+                                        pass
+                                    if len(results) >= 3:
+                                        break
+    except Exception:
+        pass
+
     # For imported multi-repo lookups
     if repo_id and repo_id not in ("sample_service", "bundled"):
         try:
@@ -500,9 +595,8 @@ def retrieve_relevant_citations_for_query(
 
             svc = get_codebase_service()
             graph = svc.get_graph(repo_id)
-            q_lower = query.lower()
             for sym in graph.symbols:
-                if sym.name.lower() in q_lower:
+                if sym.name.lower() in q:
                     matching_file = next((f for f in graph.files if f.id == sym.file_id), None)
                     if matching_file and matching_file.path not in seen_paths:
                         results.append(
@@ -524,7 +618,6 @@ def retrieve_relevant_citations_for_query(
         return results
 
     # Sample service keywords
-    q = query.lower()
     keywords_to_targets: list[tuple[tuple[str, ...], str, str | None]] = [
         (
             ("error", "exception", "fault", "serviceerror", "authenticationerror"),
@@ -566,3 +659,159 @@ def retrieve_relevant_citations_for_query(
         results.append(retrieve_symbol_context("service/auth.py", "verify_token", repo_id=repo_id))
 
     return results
+
+
+def get_contextual_prompt_suggestions(
+    path: str | None = None,
+    symbol_name: str | None = None,
+    symbol_kind: str | None = None,
+    repo_id: str | None = None,
+) -> list[dict[str, str]]:
+    """Generate smart prompt suggestions for the active symbol and verified relationships."""
+    clean_sym = (symbol_name or "").strip()
+    clean_kind = (symbol_kind or "").strip().lower()
+    clean_path = (path or "").strip()
+
+    # 1. React Component
+    if clean_kind == "component" or (
+        clean_path.endswith((".tsx", ".jsx")) and clean_sym and clean_sym[0].isupper()
+    ):
+        return [
+            {
+                "label": "What does this component do?",
+                "prompt": (
+                    f"Explain what <{clean_sym or 'component'} /> does, its props, and JSX"
+                    " rendering."
+                ),
+            },
+            {
+                "label": "Where is this rendered?",
+                "prompt": (
+                    f"Where is <{clean_sym or 'component'} /> rendered or imported in the code?"
+                ),
+            },
+            {
+                "label": "Explain its dependencies",
+                "prompt": (
+                    f"Explain the dependencies, child components, and hooks used by"
+                    f" <{clean_sym or 'component'} />."
+                ),
+            },
+            {
+                "label": "How does data flow here?",
+                "prompt": (
+                    f"How does state and data flow into and through <{clean_sym or 'component'} />?"
+                ),
+            },
+        ]
+
+    # 2. Class or Interface
+    if clean_kind in ("class", "interface"):
+        target = clean_sym or "this class"
+        return [
+            {
+                "label": f"Explain class {clean_sym or 'role'}",
+                "prompt": f"Explain class {target}, its state encapsulation, and primary methods.",
+            },
+            {
+                "label": "Where is this used?",
+                "prompt": (
+                    f"Where is {target} instantiated, extended, or referenced in the codebase?"
+                ),
+            },
+            {
+                "label": "Explain its dependencies",
+                "prompt": f"What dependencies, imports, and base classes does {target} rely on?",
+            },
+            {
+                "label": "How does data flow here?",
+                "prompt": f"How does data flow through {target} during execution?",
+            },
+        ]
+
+    # 3. Function or Method
+    if clean_kind in ("function", "method") or (
+        clean_sym and clean_kind not in ("file", "group", "class", "interface", "component")
+    ):
+        target = clean_sym or "this function"
+        return [
+            {
+                "label": f"What does {clean_sym or 'this function'} do?",
+                "prompt": (
+                    f"Explain the purpose, arguments, and behavior of {target} in"
+                    f" {clean_path or 'this codebase'}."
+                ),
+            },
+            {
+                "label": "Where is this called?",
+                "prompt": (
+                    f"Where is {target} called across this repository? Trace its verified call"
+                    " sites."
+                ),
+            },
+            {
+                "label": "Explain its dependencies",
+                "prompt": (
+                    f"Explain what functions, modules, and external packages {target} depends on."
+                ),
+            },
+            {
+                "label": "How does data flow here?",
+                "prompt": (
+                    f"How does data flow through {target}, and what exceptions or return values"
+                    " does it produce?"
+                ),
+            },
+        ]
+
+    # 4. File-level context
+    if clean_path and (clean_kind == "file" or not clean_sym):
+        file_name = clean_path.split("/")[-1]
+        return [
+            {
+                "label": f"Explain {file_name} role",
+                "prompt": f"Explain the architectural role of {clean_path} in this repository.",
+            },
+            {
+                "label": "What are the key exports?",
+                "prompt": (
+                    f"What are the primary functions, classes, and exported symbols defined in"
+                    f" {clean_path}?"
+                ),
+            },
+            {
+                "label": "Trace dependencies",
+                "prompt": f"What modules and dependencies does {clean_path} import or call?",
+            },
+            {
+                "label": "How does data flow here?",
+                "prompt": f"How does data flow into and out of {clean_path}?",
+            },
+        ]
+
+    # 5. Whole repository level context (no selection)
+    return [
+        {
+            "label": "Explain Architecture",
+            "prompt": (
+                "Explain the main entrypoint and high-level architecture of this repository."
+            ),
+        },
+        {
+            "label": "Trace execution flow",
+            "prompt": (
+                "How does the primary data flow and execution pipeline work across this codebase?"
+            ),
+        },
+        {
+            "label": "Error handling",
+            "prompt": "Where are domain errors and exceptions defined and handled?",
+        },
+        {
+            "label": "Explain dependencies",
+            "prompt": (
+                "What external packages and internal module dependencies does this codebase rely"
+                " on?"
+            ),
+        },
+    ]

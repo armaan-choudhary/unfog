@@ -4,19 +4,30 @@ import React, { useState } from "react";
 import { Code2, Bot, Trophy, ChevronRight, ChevronLeft } from "lucide-react";
 import { CodebaseNodeData } from "../Map/CustomNode";
 import { CitationRef } from "../../lib/types";
-import { SourceInspectorTab } from "./SourceInspectorTab";
+import {
+  SourceInspectorTab,
+  RelationshipFocusDirection,
+} from "./SourceInspectorTab";
 import { AiCompanionTab } from "./AiCompanionTab";
 import { LearningArenaTab } from "./LearningArenaTab";
 import styles from "./InspectorPanel.module.css";
 
 export type InspectorTab = "source" | "ai" | "learning";
 
-interface InspectorPanelProps {
+export interface InspectorPanelProps {
   selectedNode: CodebaseNodeData | null;
   repoId?: string;
   activeTab: InspectorTab;
   onChangeTab: (tab: InspectorTab) => void;
   onNavigateCitation: (citation: CitationRef) => void;
+  onFocusRelationships?: (
+    direction: RelationshipFocusDirection,
+    symbolId: string,
+  ) => void;
+  repoOwner?: string;
+  repoName?: string;
+  commitSha?: string;
+  isBundled?: boolean;
 }
 
 export function InspectorPanel({
@@ -25,6 +36,11 @@ export function InspectorPanel({
   activeTab,
   onChangeTab,
   onNavigateCitation,
+  onFocusRelationships,
+  repoOwner,
+  repoName,
+  commitSha,
+  isBundled,
 }: InspectorPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [aiInitialPrompt, setAiInitialPrompt] = useState<string | undefined>(
@@ -137,6 +153,11 @@ export function InspectorPanel({
               selectedNode={selectedNode}
               repoId={repoId}
               onAskAi={handleAskAiFromSource}
+              onFocusRelationships={onFocusRelationships}
+              repoOwner={repoOwner}
+              repoName={repoName}
+              commitSha={commitSha}
+              isBundled={isBundled}
             />
           )}
 

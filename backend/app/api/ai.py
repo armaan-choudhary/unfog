@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 
+from app.ai.context import get_contextual_prompt_suggestions
 from app.ai.schemas import (
     ChatRequest,
     ChatResponse,
@@ -49,3 +50,24 @@ async def chat_codebase(request: ChatRequest) -> ChatResponse:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
+
+
+@router.get(
+    "/suggestions",
+    response_model=list[dict[str, str]],
+    status_code=status.HTTP_200_OK,
+    summary="Get contextual prompt suggestions based on selected symbol and relationships",
+)
+async def get_prompt_suggestions(
+    path: str | None = Query(default=None, description="Optional relative file path"),
+    symbol_name: str | None = Query(default=None, description="Optional symbol name"),
+    symbol_kind: str | None = Query(default=None, description="Optional symbol kind"),
+    repo_id: str | None = Query(default=None, description="Optional repository identifier"),
+) -> list[dict[str, str]]:
+    """Return smart contextual prompt suggestions based on active symbol and relationships."""
+    return get_contextual_prompt_suggestions(
+        path=path,
+        symbol_name=symbol_name,
+        symbol_kind=symbol_kind,
+        repo_id=repo_id,
+    )
